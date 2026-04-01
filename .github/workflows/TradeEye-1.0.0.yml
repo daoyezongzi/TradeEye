@@ -1,28 +1,36 @@
-name: Stock-Bot-Schedule
+name: Stock Analysis Automation
 
+# 触发条件：北京时间收盘后运行，或手动触发
 on:
   schedule:
-    # 每天北京时间 15:15 运行 (国际标准时间 07:15)
-    - cron: '15 7 * * 1-5'
-  workflow_dispatch: # 保留这个，方便你随时手动点击测试
+    # UTC 07:30 = 北京时间 15:30 (周一至周五)
+    - cron: '30 07 * * 1-5'
+  workflow_dispatch: # 允许手动点击按钮触发
 
 jobs:
-  run-bot:
+  trade_eye_job:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout code
+      - name: 1. 拉取仓库代码
         uses: actions/checkout@v3
 
-      - name: Set up Python
+      - name: 2. 安装 Python 环境
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
 
-      - name: Install dependencies
-        run: pip install requests
+      - name: 3. 安装必要依赖库
+        # 这里安装了 requests（发 API）和 tushare（取数）
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests tushare
 
-      - name: Run script
+      - name: 4. 执行分析脚本
         env:
-          # 这里会去你设置好的 Secrets 里取 Key
+          # 核心：将你在 GitHub Secrets 设置的密钥映射给 Python
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
           DIFY_API_KEY: ${{ secrets.DIFY_API_KEY }}
+          FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
+        # 确保这里的文件名和你的主程序文件名 main.py 严格一致
         run: python main.py
