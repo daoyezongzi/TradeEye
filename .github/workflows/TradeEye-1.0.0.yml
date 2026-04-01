@@ -1,10 +1,10 @@
 name: Stock Analysis Automation
 
-# 触发条件：北京时间14.30后运行，或手动触发
+# 触发条件：北京时间15.30后运行，或手动触发
 on:
   schedule:
-    # UTC 06:30 = 北京时间 14:30 (周一至周五)
-    - cron: '30 06 * * 1-5'
+    # UTC 07:30 = 北京时间 15:30 (周一至周五)
+    - cron: '30 07 * * 1-5'
   workflow_dispatch: # 允许手动点击按钮触发
 
 jobs:
