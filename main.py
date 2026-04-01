@@ -16,12 +16,17 @@ ts.set_token(TUSHARE_TOKEN)
 pro = ts.pro_api()
 
 def fetch_tushare_data(code):
-    """目标 2：取代爬虫，获取稳定数据"""
     try:
+        # 获取基础信息（为了拿名称）
+        base_info = pro.stock_basic(ts_code=code, fields='name')
+        name = base_info.iloc[0]['name'] if not base_info.empty else "未知股票"
+        
+        # 获取日线行情
         df = pro.daily(ts_code=code, limit=1)
         if not df.empty:
             it = df.iloc[0]
-            return f"股票:{code}, 日期:{it['trade_date']}, 收盘:{it['close']}, 涨跌:{it['pct_chg']}%"
+            # --- 关键修改：把名称加进去 ---
+            return f"代码:{code}, 名称:{name}, 日期:{it['trade_date']}, 现价:{it['close']}, 涨跌幅:{it['pct_chg']}%"
     except Exception as e:
         print(f"❌ Tushare 错误 ({code}): {e}")
     return None
