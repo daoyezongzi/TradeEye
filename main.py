@@ -45,11 +45,21 @@ def fetch_tushare_data(code):
         vol_status = "放量" if vol_ratio >= 1.5 else "缩量" if vol_ratio <= 0.7 else "平量"
 
         # --- 组装增强版数据包 ---
+        # 在 fetch_tushare_data 函数内部，找到组装 data_str 的地方：
+
+        # 提取更多参考价格
+        low_price = latest['low']   # 今日最低价（通常作为即时支撑）
+        high_price = latest['high'] # 今日最高价（通常作为即时压力）
+        prev_low = prev['low']     # 昨日最低价
+        
+        # --- 修改后的增强版数据包 ---
         data_str = (
             f"名称:{name}({code}), 现价:{latest['close']}, 涨跌:{latest['pct_chg']}%, "
-            f"5日均线:{round(latest['ma5'], 2)}, 20日均线:{round(latest['ma20'], 2)}, "
-            f"成交量:{vol_status}(较昨日{round(vol_ratio, 2)}倍), 换手率:{turnover}%"
+            f"MA5:{round(latest['ma5'], 2)}, MA20:{round(latest['ma20'], 2)}, "
+            f"今日高低:[{high_price}, {low_price}], 昨日低点:{prev_low}, "  # 新增参考位
+            f"成交量:{vol_status}(量比{round(v_ratio, 2)}), 换手率:{turnover}"
         )
+
         return data_str
     except Exception as e:
         print(f"❌ 数据抓取异常 ({code}): {e}")
