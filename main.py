@@ -1,64 +1,65 @@
-import requests
 import os
 import time
+import requests
+import tushare as ts
 
-# 1. 变量配置
-# 从 GitHub Secrets 中读取 DIFY_API_KEY
+# 1. 密钥配置 (从 GitHub Secrets 读取)
+TUSHARE_TOKEN = os.environ.get("TUSHARE_TOKEN", "").strip()
 DIFY_API_KEY = os.environ.get("DIFY_API_KEY", "").strip()
-# 确保使用 Dify 官方云端 API 地址
-DIFY_URL = "https://api.dify.ai/v1/workflows/run"
+FEISHU_WEBHOOK = os.environ.get("FEISHU_WEBHOOK", "").strip()
 
-# 2. 你的自选股清单 (2026-04-01 修正版)
-MY_STOCKS = [
-    "sh601880",  # 辽港股份
-    "sh600157",  # 永泰能源
-    "sh603010",  # 万盛股份
-    "sz002372",  # 伟星新材
-    "sh600905",  # 三峡能源
-]
+# 2. 股票清单 (Tushare 格式)
+MY_STOCKS = ["601880.SH", "600157.SH", "603010.SH", "002372.SZ", "600905.SH"]
 
-def start_push():
-    if not DIFY_API_KEY:
-        print("❌ 错误: 未能在环境变量中找到 DIFY_API_KEY，请检查 GitHub Secrets 配置。")
-        return
+# 初始化 Tushare
+ts.set_token(TUSHARE_TOKEN)
+pro = ts.pro_api()
 
-    print(f"🚀 开始执行推送任务，共 {len(MY_STOCKS)} 只股票")
+def fetch_tushare_data(code):
+    """目标 2：取代爬虫，获取稳定数据"""
+    try:
+        df = pro.daily(ts_code=code, limit=1)
+        if not df.empty:
+            it = df.iloc[0]
+            return f"股票:{code}, 日期:{it['trade_date']}, 收盘:{it['close']}, 涨跌:{it['pct_chg']}%"
+    except Exception as e:
+        print(f"❌ Tushare 错误 ({code}): {e}")
+    return None
+
+def get_dify_analysis(stock_data):
+    """调用 Dify 获取 AI 分析"""
+    url = "https://api.dify.ai/v1/workflows/run"
+    headers = {"Authorization": f"Bearer {DIFY_API_KEY}", "Content-Type": "application/json"}
+    payload = {
+        "inputs": {"stock_data": stock_data},
+        "response_mode": "blocking",
+        "user": "bot"
+    }
+    res = requests.post(url, json=payload, headers=headers)
+    return res.json().get('data', {}).get('outputs', {}).get('text', '分析失败')
+
+def push_to_feishu(content):
+    """目标 1：发送合并后的消息"""
+    payload = {"msg_type": "text", "content": {"text": f"📊 每日个股复盘汇总：\n\n{content}"}}
+    requests.post(FEISHU_WEBHOOK, json=payload)
+
+def main():
+    all_reports = []
+    print(f"🚀 任务开始，共 {len(MY_STOCKS)} 只股票")
     
     for code in MY_STOCKS:
-        # 构造请求体，inputs 里的 key 必须与 Dify "开始" 节点定义的变量名一致
-        payload = {
-            "inputs": {"stock_code": code},
-            "response_mode": "blocking",
-            "user": "github_actions_bot"
-        }
-        
-        # 核心鉴权 Header
-        headers = {
-            "Authorization": f"Bearer {DIFY_API_KEY}",
-            "Content-Type": "application/json"
-        }
-        
-        try:
-            # 发起 POST 请求
-            response = requests.post(DIFY_URL, json=payload, headers=headers, timeout=60)
-            
-            if response.status_code == 200:
-                print(f"✅ 股票 {code} 推送成功！")
-            elif response.status_code == 401:
-                print(f"❌ 股票 {code} 认证失败 (401)：请检查 GitHub Secrets 中的 API Key 是否正确。")
-            elif response.status_code == 404:
-                print(f"❌ 股票 {code} 路径错误 (404)：请检查 DIFY_URL 是否正确。")
-            else:
-                print(f"❌ 股票 {code} 推送失败，返回码: {response.status_code}")
-                print(f"📝 错误详情: {response.text}")
-                
-        except Exception as e:
-            print(f"⚠️ 网络请求异常 ({code}): {e}")
-        
-        # 间隔 2 秒，防止触发 API 频率限制或飞书机器人限流
-        time.sleep(2)
+        data = fetch_tushare_data(code)
+        if data:
+            analysis = get_dify_analysis(data)
+            all_reports.append(f"📌 {code}\n{analysis}")
+            print(f"✅ {code} 分析完成")
+            time.sleep(1) # 避开频率限制
 
-    print("🎊 所有自选股推送完成！")
+    # 目标 1：在这里进行合并
+    if all_reports:
+        final_msg = "\n\n--------------------\n\n".join(all_reports)
+        push_to_feishu(final_msg)
+        print("🎊 汇总消息已推送到飞书！")
 
 if __name__ == "__main__":
-    start_push()
+    main()
