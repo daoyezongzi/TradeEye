@@ -17,21 +17,44 @@ pro = ts.pro_api()
 
 def fetch_tushare_data(code):
     try:
-        # --- 优化点：增加 fields 参数，只取我们需要的那一行 ---
-        # 很多时候 stock_basic 需要较多积分，如果这里报错，请检查 Tushare 积分
+        # 1. 获取基本信息（名称）
         base_info = pro.stock_basic(ts_code=code, fields='name')
         name = base_info.iloc[0]['name'] if not base_info.empty else "未知股票"
         
-        # 获取日线行情
-        df = pro.daily(ts_code=code, limit=1)
-        if not df.empty:
-            it = df.iloc[0]
-            # 这里一定要包含 "名称:{name}"，Dify 才能根据提示词抓取到
-            return f"代码:{code}, 名称:{name}, 日期:{it['trade_date']}, 现价:{it['close']}, 涨跌幅:{it['pct_chg']}%"
-    except Exception as e:
-        print(f"❌ Tushare 数据获取异常 ({code}): {e}")
-    return None
+        # 2. 获取最近 30 天日线行情（计算 20 日均线需要足够样本）
+        df = pro.daily(ts_code=code, limit=30)
+        if df.empty: return None
+        
+        # 按日期正序排列（算均线必须从旧到新）
+        df = df.sort_values('trade_date')
+        
+        # 计算均线 (MA)
+        df['ma5'] = df['close'].rolling(window=5).mean()
+        df['ma20'] = df['close'].rolling(window=20).mean()
+        
+        # 获取最新一天的行情数据
+        latest = df.iloc[-1]
+        prev = df.iloc[-2] # 前一天数据，用于对比成交量
+        
+        # 3. 获取换手率 (从 daily_basic 接口获取)
+        basic_df = pro.daily_basic(ts_code=code, limit=1, fields='turnover_rate')
+        turnover = basic_df.iloc[0]['turnover_rate'] if not basic_df.empty else "未知"
+        
+        # 4. 判断成交量变化（放量还是缩量）
+        vol_ratio = latest['vol'] / prev['vol']
+        vol_status = "放量" if vol_ratio >= 1.5 else "缩量" if vol_ratio <= 0.7 else "平量"
 
+        # --- 组装增强版数据包 ---
+        data_str = (
+            f"名称:{name}({code}), 现价:{latest['close']}, 涨跌:{latest['pct_chg']}%, "
+            f"5日均线:{round(latest['ma5'], 2)}, 20日均线:{round(latest['ma20'], 2)}, "
+            f"成交量:{vol_status}(较昨日{round(vol_ratio, 2)}倍), 换手率:{turnover}%"
+        )
+        return data_str
+    except Exception as e:
+        print(f"❌ 数据抓取异常 ({code}): {e}")
+    return None
+    
 def get_dify_analysis(stock_data):
     url = "https://api.dify.ai/v1/workflows/run"
     headers = {"Authorization": f"Bearer {DIFY_API_KEY}", "Content-Type": "application/json"}
