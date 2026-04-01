@@ -57,7 +57,7 @@ def fetch_tushare_data(code):
             f"名称:{name}({code}), 现价:{latest['close']}, 涨跌:{latest['pct_chg']}%, "
             f"MA5:{round(latest['ma5'], 2)}, MA20:{round(latest['ma20'], 2)}, "
             f"今日高低:[{high_price}, {low_price}], 昨日低点:{prev_low}, "  # 新增参考位
-            f"成交量:{vol_status}(量比{round(v_ratio, 2)}), 换手率:{turnover}"
+            f"成交量:{vol_status}(量比{round(vol_ratio, 2)}), 换手率:{turnover}"
         )
 
         return data_str
