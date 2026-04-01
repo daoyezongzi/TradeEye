@@ -55,8 +55,8 @@ def start_push():
         except Exception as e:
             print(f"⚠️ 网络请求异常 ({code}): {e}")
         
-        # 间隔 5 秒，防止触发 API 频率限制或飞书机器人限流
-        time.sleep(5)
+        # 间隔 2 秒，防止触发 API 频率限制或飞书机器人限流
+        time.sleep(2)
 
     print("🎊 所有自选股推送完成！")
 
