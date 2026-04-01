@@ -9,7 +9,7 @@ DIFY_API_KEY = os.environ.get("DIFY_API_KEY", "").strip()
 FEISHU_WEBHOOK = os.environ.get("FEISHU_WEBHOOK", "").strip()
 
 # 2. 股票清单
-MY_STOCKS = ["601880.SH", "600157.SH", "603010.SH", "002372.SZ", "600905.SH"]
+MY_STOCKS = ["601880.SH", "600157.SH", "603010.SH", "002372.SZ", "600905.SH", "600009.SH"]
 
 # 初始化 Tushare
 ts.set_token(TUSHARE_TOKEN)
