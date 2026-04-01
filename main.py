@@ -60,11 +60,15 @@ def main():
             print(f"✅ {code} 分析完成")
             time.sleep(1) # 避开频率限制
 
-    # 目标 1：在这里进行合并
+# 目标 1：在这里进行合并
     if all_reports:
-        final_msg = "\n\n--------------------\n\n".join(all_reports)
+        # 修改点：将原来的双重横线 "\n\n--------------------\n\n" 
+        # 改为简单的两个换行 "\n\n"，因为 Dify 的输出里已经自带了 ---
+        final_msg = "\n\n".join(all_reports)
+        
+        # 发送汇总消息
         push_to_feishu(final_msg)
-        print("🎊 汇总消息已推送到飞书！")
+        print(f"🎊 成功汇总 {len(all_reports)} 只股票分析并推送到飞书！")
 
 if __name__ == "__main__":
     main()
