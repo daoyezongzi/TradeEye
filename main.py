@@ -34,8 +34,8 @@ def get_dify_analysis(stock_data, tech_result, stock_code):
     }
     
     try:
-        # 这里的 URL 建议也用 config.DIFY_BASE_URL 拼接
-        response = requests.post(f"{config.DIFY_BASE_URL}/completion-messages", headers=headers, json=data)
+        # 这里的 URL 建议也用 config.DIFY_API_KEY 拼接
+        response = requests.post(f"{config.DIFY_API_KEY}/completion-messages", headers=headers, json=data)
         res_json = response.json()
         return res_json.get('answer', "AI 分析内容为空，请检查 Dify 工作流输出")
     except Exception as e:
