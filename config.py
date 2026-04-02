@@ -9,8 +9,11 @@ class Config:
     DIFY_API_KEY = os.getenv("DIFY_API_KEY", "")
     FEISHU_WEBHOOK = os.getenv("FEISHU_WEBHOOK", "")
     
-    # 模式开关：只要 .env 里没有显式写 DEBUG_MODE=False，本地就默认是 True
-    DEBUG_MODE = os.getenv("DEBUG_MODE", "True").lower() == "true"
+    # Dify 官方工作流 API 地址
+    DIFY_BASE_URL = os.getenv("DIFY_BASE_URL", "https://api.dify.ai/v1")
+    
+    # 模式开关：只要环境变量 DEBUG_MODE 不等于 "false"，本地默认就是调试模式
+    DEBUG_MODE = os.getenv("DEBUG_MODE", "True").lower() != "false"
     
     # 股票池
     MY_STOCKS = ["601880.SH", "600157.SH", "603010.SH", "002372.SZ", "600905.SH", "600009.SH"]
