@@ -1,9 +1,9 @@
 name: Stock Analysis Automation
 
-# 触发条件：北京时间15.30后运行，或手动触发
+# 触发条件：北京时间15.38后运行，或手动触发
 on:
   schedule:
-    # UTC 07:30 = 北京时间 15:30 (周一至周五)
+    # UTC 07:18 = 北京时间 15:18 (周一至周五)
     - cron: '18 07 * * 1-5'
   workflow_dispatch: # 允许手动点击按钮触发
 
@@ -18,19 +18,18 @@ jobs:
       - name: 2. 安装 Python 环境
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9'
+          python-version: '3.10'
 
       - name: 3. 安装必要依赖库
-        # 这里安装了 requests（发 API）和 tushare（取数）
         run: |
           python -m pip install --upgrade pip
-          pip install requests tushare
+          # 必须加上 python-dotenv，否则你的 config.py 会报错
+          pip install requests tushare python-dotenv PyYAML
 
       - name: 4. 执行分析脚本
         env:
-          # 核心：将你在 GitHub Secrets 设置的密钥映射给 Python
+          # 确保你在 GitHub Repo -> Settings -> Secrets -> Actions 里设置了这些变量
           TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
           DIFY_API_KEY: ${{ secrets.DIFY_API_KEY }}
           FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
-        # 确保这里的文件名和你的主程序文件名 main.py 严格一致
         run: python main.py
