@@ -7,15 +7,25 @@ from strategies.strategy import check_signals
 from notifier import send_report
 
 def get_dify_analysis(stock_data, tech_result, stock_code):
-    """接入 Dify 工作流 (Workflow) 获取资深交易员视角的深度复盘"""
+    """接入 Dify 工作流 (Workflow) 获取深度复盘"""
     
-    # 1. 组装输入数据：将本地计算的硬核指标（得分、逻辑）全部喂给 AI
-    # 这里必须包含现价、MA20、量比等，以满足你 Prompt 中“数据内化”的要求
+    # 从嵌套的 'latest' 和 'prev' 中提取具体数值
+    latest = stock_data.get('latest', {})
+    prev = stock_data.get('prev', {})
+    
+    # 重新定义变量，匹配你的字典结构
+    price = latest.get('close')  # 对应你打印的 close: 27.88
+    ma20 = latest.get('ma20')    # 对应你打印的 ma20: 28.5855
+    high = latest.get('high')    # 对应你打印的 high: 28.12
+    low = latest.get('low')      # 对应你打印的 low: 27.75
+    last_low = prev.get('low')   # 对应你打印的昨日低点: 27.76
+    
+    # 组装输入数据：现在这些变量都有值了，不再是 None
     input_text = (
-        f"名称:{stock_data.get('name')}, 代码:{stock_code}, 现价:{stock_data.get('now') or stock_data.get('price')}, "
-        f"MA20:{stock_data.get('ma20')}, 量比:{tech_result.get('vol_ratio')}, 换手率:{stock_data.get('turnover')}, "
+        f"名称:{stock_data.get('name')}, 代码:{stock_code}, 现价:{price}, "
+        f"MA20:{ma20}, 量比:{tech_result.get('vol_ratio')}, 换手率:{tech_result.get('turnover_rate', '无')}, "
         f"本地得分:{tech_result.get('score')}, 技术逻辑:{tech_result.get('detail')}, "
-        f"今日高点:{stock_data.get('high')}, 今日最低:{stock_data.get('low')}, 昨日低点:{stock_data.get('last_low')}"
+        f"今日高点:{high}, 今日最低:{low}, 昨日低点:{last_low}"
     )
     
     # 2. 直接使用 Dify 官方工作流标准 API 地址
