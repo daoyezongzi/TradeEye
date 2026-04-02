@@ -4,7 +4,7 @@ name: Stock Analysis Automation
 on:
   schedule:
     # UTC 07:30 = 北京时间 15:30 (周一至周五)
-    - cron: '30 07 * * 1-5'
+    - cron: '39 08 * * 1-5'
   workflow_dispatch: # 允许手动点击按钮触发
 
 jobs:
