@@ -14,6 +14,7 @@ class Config:
     
     # 模式开关：只要环境变量 DEBUG_MODE 不等于 "false"，本地默认就是调试模式
     DEBUG_MODE = os.getenv("DEBUG_MODE", "True").lower() != "false"
+    DEBUG_MODE = False
     
     # 股票池
     MY_STOCKS = ["601880.SH", "600157.SH", "603010.SH", "002372.SZ", "600905.SH", "600009.SH"]
