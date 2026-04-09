@@ -1,4 +1,12 @@
 .env
-venv/
+.pytest_cache/
 __pycache__/
+*.pyc
 *.csv
+debug_data/
+venv/
+AGENTS.md
+findings.md
+progress.md
+task_plan.md
+requirements-dev.txt
