@@ -26,5 +26,9 @@ class Config:
     def MY_STOCKS(self) -> list[str]:
         return load_settings().my_stocks
 
+    @property
+    def ALLOWED_EXCHANGES(self) -> tuple[str, ...]:
+        return load_settings().allowed_exchanges
+
 
 config = Config()
