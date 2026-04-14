@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
-from tradeeye.config import Settings, load_settings
+from tradeeye.config import Settings, load_settings, split_stocks_by_exchange
 from tradeeye.logging_utils import configure_logging
 from tradeeye.services.analysis import get_dify_analysis
 from tradeeye.services.data import get_clean_data
@@ -13,7 +13,7 @@ from tradeeye.strategies.strategy import check_signals
 
 logger = logging.getLogger(__name__)
 
-DataFetcher = Callable[[str, Settings], dict[str, Any] | None]
+DataFetcher = Callable[[str, Settings], Optional[dict[str, Any]]]
 Analyzer = Callable[[dict[str, Any], dict[str, Any], str, Settings], str]
 Notifier = Callable[[str, Settings], bool]
 
@@ -56,7 +56,18 @@ def main(
 
     all_reports: list[str] = []
     failed_codes: list[str] = []
-    for code in settings.my_stocks:
+    selected_codes, excluded_codes = split_stocks_by_exchange(settings.my_stocks, settings.allowed_exchanges)
+    if excluded_codes:
+        logger.info(
+            "Skipping stocks outside ALLOWED_EXCHANGES=%s: %s",
+            ",".join(settings.allowed_exchanges),
+            ", ".join(excluded_codes),
+        )
+
+    if settings.my_stocks and not selected_codes:
+        logger.warning("No stocks matched ALLOWED_EXCHANGES=%s", ",".join(settings.allowed_exchanges))
+
+    for code in selected_codes:
         data = data_fetcher(code, settings)
         if not data:
             failed_codes.append(code)

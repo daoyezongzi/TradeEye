@@ -27,6 +27,7 @@ python main.py
 - `DIFY_BASE_URL`: Dify API base URL, defaults to `https://api.dify.ai/v1`
 - `DEBUG_MODE`: when `true`, writes debug CSV files and prints reports locally
 - `MY_STOCKS`: comma-separated stock codes
+- `ALLOWED_EXCHANGES`: comma-separated exchange filters such as `SH,SZ` or `SH,SZ,BJ`
 
 ## Testing
 

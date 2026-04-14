@@ -19,6 +19,22 @@ DEFAULT_STOCKS = (
     "600009.SH",
     "600010.SH",
 )
+DEFAULT_ALLOWED_EXCHANGES = ("SH", "SZ", "BJ")
+
+EXCHANGE_ALIASES = {
+    "SH": {"SH", "SSE", "沪", "沪市", "上海", "上交所", "上海证券交易所"},
+    "SZ": {"SZ", "SZSE", "深", "深市", "深圳", "深交所", "深圳证券交易所"},
+    "BJ": {"BJ", "BSE", "北", "北市", "北京", "北交所", "北京证券交易所"},
+}
+COMBINED_EXCHANGE_ALIASES = {
+    "ALL": DEFAULT_ALLOWED_EXCHANGES,
+    "ALL_MARKETS": DEFAULT_ALLOWED_EXCHANGES,
+    "A股": DEFAULT_ALLOWED_EXCHANGES,
+    "全市场": DEFAULT_ALLOWED_EXCHANGES,
+    "全部": DEFAULT_ALLOWED_EXCHANGES,
+    "沪深": ("SH", "SZ"),
+    "沪深交易所": ("SH", "SZ"),
+}
 
 
 def parse_bool(value: str | None, default: bool = False) -> bool:
@@ -43,6 +59,51 @@ def parse_stock_list(value: str | None, default: Iterable[str] = DEFAULT_STOCKS)
     return [item for item in stocks if item] or list(default)
 
 
+def parse_exchange_list(
+    value: str | None,
+    default: Iterable[str] = DEFAULT_ALLOWED_EXCHANGES,
+) -> tuple[str, ...]:
+    """解析交易所过滤配置，支持 `SH,SZ`、`沪深`、`北交所` 等写法。"""
+    if not value:
+        return tuple(default)
+
+    normalized_value = value.replace("，", ",").replace(" ", ",")
+    tokens = [item.strip() for item in normalized_value.split(",") if item.strip()]
+    exchanges: list[str] = []
+
+    for token in tokens:
+        for exchange in _expand_exchange_token(token):
+            if exchange not in exchanges:
+                exchanges.append(exchange)
+
+    return tuple(exchanges or tuple(default))
+
+
+def extract_exchange(code: str) -> str:
+    """从股票代码提取交易所后缀，如 `600000.SH` -> `SH`。"""
+    if not code or "." not in code:
+        return ""
+    return code.rsplit(".", maxsplit=1)[-1].upper()
+
+
+def split_stocks_by_exchange(
+    stocks: Iterable[str],
+    allowed_exchanges: Iterable[str],
+) -> tuple[list[str], list[str]]:
+    """按允许的交易所拆分股票列表。"""
+    allowed_set = {exchange.upper() for exchange in allowed_exchanges}
+    included: list[str] = []
+    excluded: list[str] = []
+
+    for stock in stocks:
+        if extract_exchange(stock) in allowed_set:
+            included.append(stock)
+        else:
+            excluded.append(stock)
+
+    return included, excluded
+
+
 @dataclass(frozen=True)
 class Settings:
     """运行时配置。
@@ -62,6 +123,8 @@ class Settings:
     debug_mode: bool
     # 需要分析的股票列表，支持逗号分隔配置多个标的。
     my_stocks: list[str]
+    # 允许纳入分析和市场横向比较的交易所列表，如 SH/SZ/BJ。
+    allowed_exchanges: tuple[str, ...]
 
     @property
     def dify_workflow_url(self) -> str:
@@ -78,6 +141,7 @@ class Settings:
             dify_base_url=os.getenv("DIFY_BASE_URL", "https://api.dify.ai/v1").strip() or "https://api.dify.ai/v1",
             debug_mode=parse_bool(os.getenv("DEBUG_MODE"), default=False),
             my_stocks=parse_stock_list(os.getenv("MY_STOCKS")),
+            allowed_exchanges=parse_exchange_list(os.getenv("ALLOWED_EXCHANGES")),
         )
 
 
@@ -85,3 +149,19 @@ class Settings:
 def load_settings() -> Settings:
     """缓存配置，避免单次运行中重复读取环境变量。"""
     return Settings.from_env()
+
+
+def _expand_exchange_token(token: str) -> tuple[str, ...]:
+    raw_token = token.strip()
+    upper_token = raw_token.upper()
+
+    if upper_token in COMBINED_EXCHANGE_ALIASES:
+        return tuple(COMBINED_EXCHANGE_ALIASES[upper_token])
+    if raw_token in COMBINED_EXCHANGE_ALIASES:
+        return tuple(COMBINED_EXCHANGE_ALIASES[raw_token])
+
+    for exchange, aliases in EXCHANGE_ALIASES.items():
+        if upper_token in aliases or raw_token in aliases:
+            return (exchange,)
+
+    return ()

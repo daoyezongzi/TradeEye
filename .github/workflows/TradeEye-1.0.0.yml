@@ -2,7 +2,7 @@ name: Stock Analysis Automation
 
 on:
   schedule:
-    - cron: "13 07 * * 1-5"
+    - cron: "10 09 * * 1-5"
   workflow_dispatch:
 
 jobs:
