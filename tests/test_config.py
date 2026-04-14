@@ -1,4 +1,14 @@
-from tradeeye.config import DEFAULT_STOCKS, Settings, load_settings, parse_bool, parse_stock_list
+from tradeeye.config import (
+    DEFAULT_ALLOWED_EXCHANGES,
+    DEFAULT_STOCKS,
+    Settings,
+    extract_exchange,
+    load_settings,
+    parse_bool,
+    parse_exchange_list,
+    parse_stock_list,
+    split_stocks_by_exchange,
+)
 
 
 def test_parse_bool_respects_common_values():
@@ -13,6 +23,24 @@ def test_parse_stock_list_falls_back_to_defaults():
     assert parse_stock_list("") == list(DEFAULT_STOCKS)
 
 
+def test_parse_exchange_list_supports_aliases():
+    assert parse_exchange_list(None) == DEFAULT_ALLOWED_EXCHANGES
+    assert parse_exchange_list("SH,SZ") == ("SH", "SZ")
+    assert parse_exchange_list("沪深") == ("SH", "SZ")
+    assert parse_exchange_list("北交所") == ("BJ",)
+
+
+def test_split_stocks_by_exchange_uses_suffix():
+    included, excluded = split_stocks_by_exchange(
+        ["600000.SH", "000001.SZ", "430001.BJ"],
+        ("SH", "SZ"),
+    )
+
+    assert included == ["600000.SH", "000001.SZ"]
+    assert excluded == ["430001.BJ"]
+    assert extract_exchange("430001.BJ") == "BJ"
+
+
 def test_load_settings_reads_environment(monkeypatch):
     monkeypatch.setenv("TUSHARE_TOKEN", "token")
     monkeypatch.setenv("DIFY_API_KEY", "api-key")
@@ -20,6 +48,7 @@ def test_load_settings_reads_environment(monkeypatch):
     monkeypatch.setenv("DIFY_BASE_URL", "https://api.example.com/v1")
     monkeypatch.setenv("DEBUG_MODE", "true")
     monkeypatch.setenv("MY_STOCKS", "000001.SZ,000002.SZ")
+    monkeypatch.setenv("ALLOWED_EXCHANGES", "沪深")
     load_settings.cache_clear()
 
     settings = load_settings()
@@ -31,3 +60,4 @@ def test_load_settings_reads_environment(monkeypatch):
     assert settings.dify_base_url == "https://api.example.com/v1"
     assert settings.debug_mode is True
     assert settings.my_stocks == ["000001.SZ", "000002.SZ"]
+    assert settings.allowed_exchanges == ("SH", "SZ")
