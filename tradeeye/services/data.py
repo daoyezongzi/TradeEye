@@ -18,12 +18,12 @@ MARKET_TZ = ZoneInfo("Asia/Shanghai")
 SNAPSHOT_READY_TIME = dt.time(17, 10)
 HISTORY_LOOKBACK_DAYS = 60
 DAILY_FIELDS = "ts_code,trade_date,open,high,low,close,pre_close,change,pct_chg,vol,amount"
-DAILY_BASIC_FIELDS = "ts_code,trade_date,turnover_rate,turnover_rate_f,volume_ratio,total_mv,circ_mv"
+DAILY_BASIC_FIELDS = "ts_code,trade_date,turnover_rate,turnover_rate_f,volume_ratio,total_mv,circ_mv,pe,pe_ttm"
 MONEYFLOW_FIELDS = (
     "ts_code,trade_date,buy_lg_amount,sell_lg_amount,buy_elg_amount,sell_elg_amount,net_mf_amount"
 )
 LIMIT_FIELDS = "ts_code,trade_date,up_limit,down_limit"
-STOCK_BASIC_FIELDS = "ts_code,name,market,list_date"
+STOCK_BASIC_FIELDS = "ts_code,name,market,list_date,industry"
 
 _SNAPSHOT_CACHE: dict[tuple[str, str], "MarketSnapshot"] = {}
 _HISTORY_CACHE: dict[tuple[str, str, str], pd.DataFrame] = {}

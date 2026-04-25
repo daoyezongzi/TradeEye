@@ -6,6 +6,7 @@ TradeEye is a stock review automation script. It fetches daily market data from 
 
 - `tradeeye/`: main package with app, config, services, and strategies
 - `main.py`: compatibility entrypoint for local runs and GitHub Actions
+- `recommend_main.py`: entrypoint for daily top-pick recommendation workflow
 - `tests/`: basic unit tests for config, app flow, and strategy logic
 - `.github/workflows/TradeEye-1.0.0.yml`: scheduled automation workflow
 
@@ -16,6 +17,7 @@ python -m venv venv
 venv\Scripts\activate
 pip install -r requirements-dev.txt
 copy .env.example .env
+python recommend_main.py
 python main.py
 ```
 
@@ -28,6 +30,9 @@ python main.py
 - `DEBUG_MODE`: when `true`, writes debug CSV files and prints reports locally
 - `MY_STOCKS`: comma-separated stock codes
 - `ALLOWED_EXCHANGES`: comma-separated exchange filters such as `SH,SZ` or `SH,SZ,BJ`
+- `RECOMMENDER_INDUSTRIES`: optional comma-separated industries for long-value filter, e.g. `半导体,电力设备`
+
+For the recommendation workflow, Dify should define an input variable named `recommendations_json`.
 
 ## Testing
 

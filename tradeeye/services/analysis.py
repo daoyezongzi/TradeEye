@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import json
 import logging
-from typing import Any
+from typing import Any, Mapping
 
 import requests
 
 from tradeeye.config import Settings
 
 logger = logging.getLogger(__name__)
+
+REC_QUERY_PREFIX = "[REC]"
+STK_QUERY_PREFIX = "[STK]"
 
 
 def build_dify_input(stock_data: dict[str, Any], tech_result: dict[str, Any], stock_code: str) -> str:
@@ -43,11 +47,51 @@ def get_dify_analysis(
     settings: Settings,
     http_client=requests,
 ) -> str:
+    query = f"{STK_QUERY_PREFIX}{build_dify_input(stock_data, tech_result, stock_code)}"
+    return _run_dify_workflow(
+        query=query,
+        settings=settings,
+        http_client=http_client,
+        log_key=stock_code,
+    )
+
+
+def get_dify_recommendation_analysis(
+    recommendations_json: str,
+    settings: Settings,
+    input_key: str = "query",
+    http_client=requests,
+) -> str:
+    # Backward compatibility: callers may still pass a custom input_key, but
+    # we now always submit Dify input via `inputs.query`.
+    _ = input_key
+    if not recommendations_json:
+        return "Warning: recommendation payload is empty"
+
+    query = f"{REC_QUERY_PREFIX}{_normalize_recommendation_payload(recommendations_json)}"
+    return _run_dify_workflow(
+        query=query,
+        settings=settings,
+        http_client=http_client,
+        log_key="daily_recommendation",
+    )
+
+
+def _run_dify_workflow(
+    query: str | Mapping[str, Any],
+    settings: Settings,
+    http_client,
+    log_key: str,
+) -> str:
     if not settings.dify_api_key:
-        return "\u274c Dify \u5de5\u4f5c\u6d41\u8c03\u7528\u5931\u8d25: missing DIFY_API_KEY"
+        return "Dify workflow failed: missing DIFY_API_KEY"
+
+    normalized_query = _normalize_query(query)
+    if not normalized_query:
+        return "Warning: empty query for Dify workflow"
 
     payload = {
-        "inputs": {"stock_data": build_dify_input(stock_data, tech_result, stock_code)},
+        "inputs": {"query": normalized_query},
         "response_mode": "blocking",
         "user": "TradeEye_Runner",
     }
@@ -68,7 +112,37 @@ def get_dify_analysis(
         analysis_result = res_data.get("data", {}).get("outputs", {}).get("text")
         if analysis_result:
             return analysis_result
-        return "\u26a0\ufe0f \u5de5\u4f5c\u6d41\u8fd0\u884c\u6210\u529f\u4f46\u672a\u8fd4\u56de\u6709\u6548\u6587\u672c"
+        return "Warning: workflow succeeded but returned no text output"
     except Exception as exc:
-        logger.exception("Dify workflow failed for %s", stock_code)
-        return f"\u274c Dify \u5de5\u4f5c\u6d41\u8c03\u7528\u5931\u8d25: {exc}"
+        logger.exception("Dify workflow failed for %s", log_key)
+        return f"Dify workflow failed: {exc}"
+
+
+def _normalize_query(query: str | Mapping[str, Any]) -> str:
+    if isinstance(query, str):
+        return query.strip()
+
+    query_value = query.get("query")
+    if isinstance(query_value, str) and query_value.strip():
+        return query_value.strip()
+
+    for value in query.values():
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
+
+
+def _normalize_recommendation_payload(recommendations_json: str) -> str:
+    try:
+        parsed = json.loads(recommendations_json)
+    except (TypeError, ValueError):
+        return recommendations_json.strip()
+
+    if not isinstance(parsed, dict):
+        if isinstance(parsed, list):
+            parsed = {"low_price_group": parsed, "mid_price_group": []}
+        else:
+            parsed = {"low_price_group": [], "mid_price_group": []}
+    parsed.setdefault("low_price_group", [])
+    parsed.setdefault("mid_price_group", [])
+    return json.dumps(parsed, ensure_ascii=False)

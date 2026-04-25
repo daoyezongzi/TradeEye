@@ -20,6 +20,8 @@ DEFAULT_STOCKS = (
     "600010.SH",
 )
 DEFAULT_ALLOWED_EXCHANGES = ("SH", "SZ", "BJ")
+DEFAULT_RECOMMENDER_INDUSTRIES: tuple[str, ...] = ()
+PRICE_RANGES = {"low": [0, 10], "mid": [10, 20]}
 
 EXCHANGE_ALIASES = {
     "SH": {"SH", "SSE", "沪", "沪市", "上海", "上交所", "上海证券交易所"},
@@ -79,6 +81,19 @@ def parse_exchange_list(
     return tuple(exchanges or tuple(default))
 
 
+def parse_industry_list(
+    value: str | None,
+    default: Iterable[str] = DEFAULT_RECOMMENDER_INDUSTRIES,
+) -> tuple[str, ...]:
+    """解析推荐模块的行业配置，格式为 `半导体,电力设备`。"""
+    if not value:
+        return tuple(default)
+
+    normalized_value = value.replace("，", ",")
+    tokens = [item.strip() for item in normalized_value.split(",") if item.strip()]
+    return tuple(dict.fromkeys(tokens)) or tuple(default)
+
+
 def extract_exchange(code: str) -> str:
     """从股票代码提取交易所后缀，如 `600000.SH` -> `SH`。"""
     if not code or "." not in code:
@@ -125,6 +140,8 @@ class Settings:
     my_stocks: list[str]
     # 允许纳入分析和市场横向比较的交易所列表，如 SH/SZ/BJ。
     allowed_exchanges: tuple[str, ...]
+    # 推荐模块关注行业；为空时不过滤行业。
+    recommender_industries: tuple[str, ...] = DEFAULT_RECOMMENDER_INDUSTRIES
 
     @property
     def dify_workflow_url(self) -> str:
@@ -142,6 +159,7 @@ class Settings:
             debug_mode=parse_bool(os.getenv("DEBUG_MODE"), default=False),
             my_stocks=parse_stock_list(os.getenv("MY_STOCKS")),
             allowed_exchanges=parse_exchange_list(os.getenv("ALLOWED_EXCHANGES")),
+            recommender_industries=parse_industry_list(os.getenv("RECOMMENDER_INDUSTRIES")),
         )
 
 
