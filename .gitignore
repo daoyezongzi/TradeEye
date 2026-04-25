@@ -1,10 +1,15 @@
 .env
-.pytest_cache/
 __pycache__/
 *.pyc
 *.csv
 debug_data/
 venv/
+.tmp/
+
+# Pytest caches
+.pytest_cache/
+pytest-cache-files-*/
+
 AGENTS.md
 findings.md
 progress.md

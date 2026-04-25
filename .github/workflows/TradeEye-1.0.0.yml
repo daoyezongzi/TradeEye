@@ -2,14 +2,40 @@ name: Stock Analysis Automation
 
 on:
   schedule:
-    - cron: "10 09 * * 1-5"
+    - cron: "0 22 * * 0-4"
+    - cron: "30 7 * * 1-5"
   workflow_dispatch:
+    inputs:
+      job_type:
+        description: "Select which job to run"
+        required: true
+        default: "recommend"
+        type: choice
+        options:
+          - recommend
+          - analysis
 
 jobs:
   trade_eye_job:
     runs-on: ubuntu-latest
+    env:
+      TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+      DIFY_API_KEY: ${{ secrets.DIFY_API_KEY }}
+      FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
+      RECOMMENDER_INDUSTRIES: ${{ vars.RECOMMENDER_INDUSTRIES }}
+      DEBUG_MODE: "false"
 
     steps:
+      - name: Smart random delay for scheduled runs
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "Scheduled run: applying random delay..."
+            sleep $(( (RANDOM % 30) * 60 ))
+          else
+            echo "Manual dispatch: skip delay and run now."
+          fi
+
       - name: Checkout repository
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
@@ -28,10 +54,14 @@ jobs:
       - name: Run tests
         run: python -m pytest
 
-      - name: Run analysis
-        env:
-          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
-          DIFY_API_KEY: ${{ secrets.DIFY_API_KEY }}
-          FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
-          DEBUG_MODE: "false"
+      - name: Run daily recommendations (REC)
+        if: >
+          (github.event_name == 'schedule' && github.event.schedule == '0 22 * * 0-4') ||
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.job_type == 'recommend')
+        run: python recommend_main.py
+
+      - name: Run stock review analysis (STK)
+        if: >
+          (github.event_name == 'schedule' && github.event.schedule == '30 7 * * 1-5') ||
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.job_type == 'analysis')
         run: python main.py
