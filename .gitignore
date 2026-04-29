@@ -5,6 +5,8 @@ __pycache__/
 debug_data/
 venv/
 .tmp/
+*.code-workspace
+workspace
 
 # Pytest caches
 .pytest_cache/
