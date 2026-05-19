@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import logging
@@ -13,42 +13,84 @@ logger = logging.getLogger(__name__)
 REC_QUERY_PREFIX = "[REC]"
 STK_QUERY_PREFIX = "[STK]"
 
+STK_SYSTEM_PROMPT = """角色：资深短线交易员（实战派）
+输入数据：来源于用户输入。请自动忽略字符串开头的 [STK] 标签，并解析其后的内容。
 
-def build_dify_input(stock_data: dict[str, Any], tech_result: dict[str, Any], stock_code: str) -> str:
+核心分析指令（必须严格执行）：
+1. 数据内化：必须提取现价、MA20、量比、换手率、本地得分。
+2. 确定性定性（拒绝模棱两可）：
+   - 现价 > MA20 判定为“多头趋势”；现价 < MA20 判定为“空头趋势”。
+   - 量比 > 1.5 判定为“放量”；量比 < 0.8 判定为“缩量”。
+   - 换手率 > 10% 判定为“情绪高涨”；换手率 < 2% 判定为“关注度极低”。
+3. 严禁造假：支撑位/压力位必须且只能从 MA20、今日最高、今日最低、昨日最低 中选择最接近数值。
+
+输出模板：
+【名称 (代码)】
+📉 个股简评：本地评分 [数值] 分。目前处于 [多头/空头] 趋势。今日 [放量/缩量] [上涨/下跌]，反映 [洗盘/出货/吸筹] 迹象。换手率 [数值]%，市场关注度 [高/低]。
+🎯 操作策略：[具体动作建议，如：持股/逢高减仓/空仓观望]。
+压力位：看 [来源名] ([具体数值] 元)
+支撑位：看 [来源名] ([具体数值] 元)
+"""
+
+REC_SYSTEM_PROMPT = """角色：顶级量化游资分析师（实战派）
+任务：对输入中的两组（共 10 只）潜力股列表进行盘后复盘。
+
+核心指令：
+1. 忽略输入开头的 [REC] 标签，解析 JSON 中的 low_price_group 和 mid_price_group。
+2. 拒绝废话：不得使用“可能”、“大概”、“或许”，必须用确定语气点评。
+3. 核心指标：关注 short_burst（短线爆发）、t_active（做T活跃度）和 total_score（总分）。
+
+输出模板：
+📊 今日选股内参 (分档精选)
+🚀 【0-10元 · 低价爆发组】
+[名称 (代码)] | 总分: [数值]
+核心逻辑：[结合维度字段点评]
+技术定性：[直接判定趋势]
+(此处简要列出该组其余 4 只标的及核心逻辑)
+⚖️ 【10-20元 · 稳健博弈组】
+[名称 (代码)] | 总分: [数值]
+核心逻辑：[结合维度字段点评]
+技术定性：[直接判定趋势]
+(此处简要列出该组其余 4 只标的及核心逻辑)
+💡 综合操盘结论：[对比两组整体质量给出唯一建议]
+"""
+
+
+def build_llm_input(stock_data: dict[str, Any], tech_result: dict[str, Any], stock_code: str) -> str:
     latest = stock_data.get("latest", {})
     prev = stock_data.get("prev", {})
     market = stock_data.get("market_regime", {})
 
     return (
-        f"\u540d\u79f0:{stock_data.get('name')}, \u4ee3\u7801:{stock_code}, "
-        f"\u4ea4\u6613\u65e5:{stock_data.get('trade_date')}, \u6536\u76d8\u4ef7:{latest.get('close')}, "
-        f"\u5f53\u65e5\u6da8\u5e45:{latest.get('pct_chg')}, MA5:{latest.get('ma5')}, MA10:{latest.get('ma10')}, MA20:{latest.get('ma20')}, "
-        f"\u672c\u5730\u72b6\u6001:{tech_result.get('status')}, \u672c\u5730\u5f97\u5206:{tech_result.get('score')}, "
-        f"\u5c3e\u76d8\u5f3a\u5ea6:{tech_result.get('close_strength')}, \u91cf\u6bd4:{tech_result.get('vol_ratio')}, "
-        f"\u6362\u624b\u7387:{tech_result.get('turnover_rate')}, \u6210\u4ea4\u989d/\u8fd15\u65e5:{tech_result.get('amount_ratio_5d')}, "
-        f"\u8d44\u91d1\u51c0\u6d41\u5165\u5360\u6bd4:{tech_result.get('net_mf_ratio_pct')}%, "
-        f"\u5927\u5355\u51c0\u989d\u5360\u6bd4:{tech_result.get('large_order_net_pct')}%, "
-        f"\u8ddd\u6da8\u505c\u5269\u4f59\u7a7a\u95f4:{tech_result.get('up_limit_room_pct')}%, "
-        f"\u8fd110\u65e5\u7a81\u7834\u5e45\u5ea6:{tech_result.get('breakout_pct')}%, "
-        f"\u5e02\u573a\u73af\u5883:{tech_result.get('market_bias')}, "
-        f"\u5168\u5e02\u573a\u4e0a\u6da8\u5360\u6bd4:{market.get('up_ratio_pct')}%, "
-        f"\u5f3a\u52bf\u80a1\u5360\u6bd4:{market.get('strong_ratio_pct')}%, "
-        f"\u6280\u672f/\u8d44\u91d1\u7406\u7531:{tech_result.get('detail')}, "
-        f"\u98ce\u9669:{tech_result.get('risk')}, \u6267\u884c\u5efa\u8bae:{tech_result.get('action_plan')}, "
-        f"\u4eca\u65e5\u9ad8\u70b9:{latest.get('high')}, \u4eca\u65e5\u6700\u4f4e:{latest.get('low')}, "
-        f"\u6628\u65e5\u4f4e\u70b9:{prev.get('low')}"
+        f"名称:{stock_data.get('name')}, 代码:{stock_code}, "
+        f"交易日:{stock_data.get('trade_date')}, 收盘价:{latest.get('close')}, "
+        f"当日涨幅:{latest.get('pct_chg')}, MA5:{latest.get('ma5')}, MA10:{latest.get('ma10')}, MA20:{latest.get('ma20')}, "
+        f"本地状态:{tech_result.get('status')}, 本地得分:{tech_result.get('score')}, "
+        f"尾盘强度:{tech_result.get('close_strength')}, 量比:{tech_result.get('vol_ratio')}, "
+        f"换手率:{tech_result.get('turnover_rate')}, 成交额/近5日:{tech_result.get('amount_ratio_5d')}, "
+        f"资金净流入占比:{tech_result.get('net_mf_ratio_pct')}%, "
+        f"大单净额占比:{tech_result.get('large_order_net_pct')}%, "
+        f"距涨停剩余空间:{tech_result.get('up_limit_room_pct')}%, "
+        f"近10日突破幅度:{tech_result.get('breakout_pct')}%, "
+        f"市场环境:{tech_result.get('market_bias')}, "
+        f"全市场上涨占比:{market.get('up_ratio_pct')}%, "
+        f"强势股占比:{market.get('strong_ratio_pct')}%, "
+        f"技术/资金理由:{tech_result.get('detail')}, "
+        f"风险:{tech_result.get('risk')}, 执行建议:{tech_result.get('action_plan')}, "
+        f"今日高点:{latest.get('high')}, 今日最低:{latest.get('low')}, "
+        f"昨日低点:{prev.get('low')}"
     )
 
 
-def get_dify_analysis(
+def get_llm_analysis(
     stock_data: dict[str, Any],
     tech_result: dict[str, Any],
     stock_code: str,
     settings: Settings,
     http_client=requests,
 ) -> str:
-    query = f"{STK_QUERY_PREFIX}{build_dify_input(stock_data, tech_result, stock_code)}"
-    return _run_dify_workflow(
+    query = f"{STK_QUERY_PREFIX}{build_llm_input(stock_data, tech_result, stock_code)}"
+    return run_llm_call(
         query=query,
         settings=settings,
         http_client=http_client,
@@ -56,20 +98,18 @@ def get_dify_analysis(
     )
 
 
-def get_dify_recommendation_analysis(
+def get_llm_recommendation_analysis(
     recommendations_json: str,
     settings: Settings,
     input_key: str = "query",
     http_client=requests,
 ) -> str:
-    # Backward compatibility: callers may still pass a custom input_key, but
-    # we now always submit Dify input via `inputs.query`.
     _ = input_key
     if not recommendations_json:
         return "Warning: recommendation payload is empty"
 
     query = f"{REC_QUERY_PREFIX}{_normalize_recommendation_payload(recommendations_json)}"
-    return _run_dify_workflow(
+    return run_llm_call(
         query=query,
         settings=settings,
         http_client=http_client,
@@ -77,45 +117,65 @@ def get_dify_recommendation_analysis(
     )
 
 
-def _run_dify_workflow(
+def run_llm_call(
     query: str | Mapping[str, Any],
     settings: Settings,
     http_client,
     log_key: str,
 ) -> str:
-    if not settings.dify_api_key:
-        return "Dify workflow failed: missing DIFY_API_KEY"
+    api_key = settings.llm_api_key
+    if not api_key:
+        return "LLM call failed: missing LLM_API_KEY"
 
     normalized_query = _normalize_query(query)
     if not normalized_query:
-        return "Warning: empty query for Dify workflow"
+        return "Warning: empty query for LLM call"
+
+    query_kind, normalized_payload = _split_query_and_kind(normalized_query)
+    system_prompt = REC_SYSTEM_PROMPT if query_kind == "rec" else STK_SYSTEM_PROMPT
+    temperature = 0.7 if query_kind == "rec" else 0.0
 
     payload = {
-        "inputs": {"query": normalized_query},
-        "response_mode": "blocking",
-        "user": "TradeEye_Runner",
+        "model": settings.llm_model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": normalized_payload},
+        ],
+        "temperature": temperature,
     }
     headers = {
-        "Authorization": f"Bearer {settings.dify_api_key}",
+        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
 
     try:
         response = http_client.post(
-            settings.dify_workflow_url,
+            settings.llm_chat_completions_url,
             headers=headers,
             json=payload,
-            timeout=60,
+            timeout=settings.llm_timeout_sec,
         )
         response.raise_for_status()
         res_data = response.json()
-        analysis_result = res_data.get("data", {}).get("outputs", {}).get("text")
-        if analysis_result:
-            return analysis_result
-        return "Warning: workflow succeeded but returned no text output"
+        choices = res_data.get("choices") or []
+        if choices:
+            message = choices[0].get("message", {})
+            content = message.get("content")
+            if isinstance(content, str) and content.strip():
+                return content.strip()
+        return "Warning: LLM call succeeded but returned no text output"
     except Exception as exc:
-        logger.exception("Dify workflow failed for %s", log_key)
-        return f"Dify workflow failed: {exc}"
+        logger.exception("LLM call failed for %s", log_key)
+        return f"LLM call failed: {exc}"
+
+
+def _split_query_and_kind(value: str) -> tuple[str, str]:
+    text = value.strip()
+    if text.startswith(REC_QUERY_PREFIX):
+        return "rec", text[len(REC_QUERY_PREFIX) :].strip()
+    if text.startswith(STK_QUERY_PREFIX):
+        return "stk", text[len(STK_QUERY_PREFIX) :].strip()
+    return "stk", text
 
 
 def _normalize_query(query: str | Mapping[str, Any]) -> str:

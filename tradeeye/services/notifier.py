@@ -9,14 +9,24 @@ from tradeeye.config import Settings
 logger = logging.getLogger(__name__)
 
 
-def build_payload(content: str) -> dict[str, object]:
+def build_payload(
+    content: str,
+    title: str = "个股盘后复盘报告",
+    icon: str = "\U0001f4ca",
+) -> dict[str, object]:
     return {
         "msg_type": "text",
-        "content": {"text": f"\U0001f4ca \u4e2a\u80a1\u76d8\u540e\u590d\u76d8\u62a5\u544a:\n\n{content}"},
+        "content": {"text": f"{icon} {title}:\n\n{content}"},
     }
 
 
-def send_report(content: str, settings: Settings, http_client=requests) -> bool:
+def send_text(
+    content: str,
+    settings: Settings,
+    title: str,
+    icon: str = "\U0001f4ca",
+    http_client=requests,
+) -> bool:
     if settings.debug_mode:
         print("\n" + "=" * 20 + " DEBUG REPORT " + "=" * 20)
         print(content)
@@ -30,7 +40,7 @@ def send_report(content: str, settings: Settings, http_client=requests) -> bool:
     try:
         response = http_client.post(
             settings.feishu_webhook,
-            json=build_payload(content),
+            json=build_payload(content, title=title, icon=icon),
             timeout=10,
         )
         response.raise_for_status()
@@ -38,3 +48,13 @@ def send_report(content: str, settings: Settings, http_client=requests) -> bool:
     except Exception:
         logger.exception("Feishu notification failed")
         return False
+
+
+def send_report(content: str, settings: Settings, http_client=requests) -> bool:
+    return send_text(
+        content=content,
+        settings=settings,
+        title="个股盘后复盘报告",
+        icon="\U0001f4ca",
+        http_client=http_client,
+    )

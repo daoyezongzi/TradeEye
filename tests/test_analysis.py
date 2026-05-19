@@ -1,7 +1,7 @@
-import json
+﻿import json
 
 from tradeeye.config import Settings
-from tradeeye.services.analysis import _run_dify_workflow, get_dify_analysis, get_dify_recommendation_analysis
+from tradeeye.services.analysis import get_llm_analysis, get_llm_recommendation_analysis, run_llm_call
 
 
 class _DummyResponse:
@@ -26,22 +26,24 @@ class _DummyHttpClient:
             "json": json,
             "timeout": timeout,
         }
-        return _DummyResponse({"data": {"outputs": {"text": "workflow-ok"}}})
+        return _DummyResponse({"choices": [{"message": {"content": "workflow-ok"}}]})
 
 
 def make_settings() -> Settings:
     return Settings(
         tushare_token="token",
-        dify_api_key="api",
         feishu_webhook="https://example.com",
-        dify_base_url="https://api.dify.ai/v1",
         debug_mode=True,
         my_stocks=[],
         allowed_exchanges=("SH", "SZ", "BJ"),
+        llm_api_key="llm-key",
+        llm_base_url="https://api.deepseek.com",
+        llm_model="deepseek-v4-flash",
+        llm_timeout_sec=60,
     )
 
 
-def test_get_dify_recommendation_analysis_sends_prefixed_query():
+def test_get_llm_recommendation_analysis_uses_rec_prompt_and_payload():
     settings = make_settings()
     http_client = _DummyHttpClient()
     raw_json = json.dumps(
@@ -52,22 +54,24 @@ def test_get_dify_recommendation_analysis_sends_prefixed_query():
         ensure_ascii=False,
     )
 
-    result = get_dify_recommendation_analysis(
+    result = get_llm_recommendation_analysis(
         recommendations_json=raw_json,
         settings=settings,
-        input_key="daily_candidates",  # ignored for compatibility
+        input_key="daily_candidates",
         http_client=http_client,
     )
 
     assert result == "workflow-ok"
-    assert http_client.last_request is not None
-    query = http_client.last_request["json"]["inputs"]["query"]
-    assert query.startswith("[REC]")
-    parsed = json.loads(query[len("[REC]") :])
+    req = http_client.last_request
+    assert req is not None
+    assert req["url"] == "https://api.deepseek.com/chat/completions"
+    assert req["json"]["model"] == "deepseek-v4-flash"
+    assert req["json"]["temperature"] == 0.7
+    parsed = json.loads(req["json"]["messages"][1]["content"])
     assert set(parsed.keys()) == {"low_price_group", "mid_price_group"}
 
 
-def test_get_dify_analysis_sends_prefixed_query():
+def test_get_llm_analysis_uses_stk_prompt_and_payload():
     settings = make_settings()
     http_client = _DummyHttpClient()
 
@@ -95,7 +99,7 @@ def test_get_dify_analysis_sends_prefixed_query():
         "action_plan": "observe",
     }
 
-    result = get_dify_analysis(
+    result = get_llm_analysis(
         stock_data=stock_data,
         tech_result=tech_result,
         stock_code="600001.SH",
@@ -104,17 +108,19 @@ def test_get_dify_analysis_sends_prefixed_query():
     )
 
     assert result == "workflow-ok"
-    assert http_client.last_request is not None
-    query = http_client.last_request["json"]["inputs"]["query"]
-    assert query.startswith("[STK]")
-    assert "600001.SH" in query
+    req = http_client.last_request
+    assert req is not None
+    assert req["json"]["temperature"] == 0.0
+    user_content = req["json"]["messages"][1]["content"]
+    assert "600001.SH" in user_content
+    assert not user_content.startswith("[STK]")
 
 
-def test_run_dify_workflow_accepts_legacy_mapping_input():
+def test_run_llm_call_accepts_legacy_mapping_input():
     settings = make_settings()
     http_client = _DummyHttpClient()
 
-    result = _run_dify_workflow(
+    result = run_llm_call(
         query={"stock_data": "legacy-content"},
         settings=settings,
         http_client=http_client,
@@ -123,4 +129,4 @@ def test_run_dify_workflow_accepts_legacy_mapping_input():
 
     assert result == "workflow-ok"
     assert http_client.last_request is not None
-    assert http_client.last_request["json"]["inputs"]["query"] == "legacy-content"
+    assert http_client.last_request["json"]["messages"][1]["content"] == "legacy-content"

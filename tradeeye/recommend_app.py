@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import datetime as dt
 import logging
@@ -6,7 +6,7 @@ from typing import Any, Callable
 
 from tradeeye.config import Settings, load_settings
 from tradeeye.logging_utils import configure_logging
-from tradeeye.services.analysis import get_dify_recommendation_analysis
+from tradeeye.services.analysis import get_llm_recommendation_analysis
 from tradeeye.services.notifier import send_report
 from tradeeye.strategies.stock_recommender import (
     build_recommendation_brief,
@@ -28,13 +28,13 @@ def build_recommendation_content(
 ) -> str:
     date_text = (report_date or dt.date.today()).strftime("%Y-%m-%d")
     brief = build_recommendation_brief(recommendations)
-    return f"{date_text} 每日好股推荐\n\n{brief}\n\nDify 分析：\n{ai_analysis}"
+    return f"{date_text} 姣忔棩濂借偂鎺ㄨ崘\n\n{brief}\n\nLLM 鍒嗘瀽锛歕n{ai_analysis}"
 
 
 def main(
     settings: Settings | None = None,
     recommender: Recommender = recommend_top_stocks,
-    analyzer: Analyzer = get_dify_recommendation_analysis,
+    analyzer: Analyzer = get_llm_recommendation_analysis,
     notifier: Notifier = send_report,
     top_n: int = 5,
 ) -> int:
@@ -62,3 +62,5 @@ def main(
 
 def _has_recommendations(recommendations: dict[str, list[dict[str, Any]]]) -> bool:
     return bool(recommendations.get("low_price_group") or recommendations.get("mid_price_group"))
+
+

@@ -1,0 +1,5 @@
+{date} 财经新闻简报
+
+共 {count} 条要闻：
+
+{items_block}

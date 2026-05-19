@@ -1,4 +1,4 @@
-import datetime as dt
+﻿import datetime as dt
 
 from tradeeye.app import build_final_content, main
 from tradeeye.config import Settings
@@ -7,19 +7,18 @@ from tradeeye.config import Settings
 def make_settings(debug_mode: bool = True) -> Settings:
     return Settings(
         tushare_token="token",
-        dify_api_key="api",
         feishu_webhook="https://example.com",
-        dify_base_url="https://api.dify.ai/v1",
         debug_mode=debug_mode,
         my_stocks=["000001.SZ"],
         allowed_exchanges=("SH", "SZ", "BJ"),
+        llm_api_key="llm-key",
     )
 
 
 def make_strong_payload():
     return {
         "name": "Momentum Corp",
-        "market_regime": {"status": "偏强", "score": 20},
+        "market_regime": {"status": "strong", "score": 20},
         "latest": {
             "ts_code": "000001.SZ",
             "close": 10.4,
@@ -42,7 +41,7 @@ def make_strong_payload():
             "net_mf_ratio_rank": 0.87,
             "large_order_net_rank": 0.83,
             "list_age_days": 600,
-            "market": "主板",
+            "market": "main",
         },
         "prev": {"vol": 100, "low": 9.7},
     }
@@ -98,12 +97,11 @@ def test_main_runs_end_to_end_with_injected_services():
 def test_main_returns_nonzero_when_tushare_token_missing():
     settings = Settings(
         tushare_token="",
-        dify_api_key="api",
         feishu_webhook="https://example.com",
-        dify_base_url="https://api.dify.ai/v1",
         debug_mode=True,
         my_stocks=["000001.SZ"],
         allowed_exchanges=("SH", "SZ", "BJ"),
+        llm_api_key="llm-key",
     )
 
     exit_code = main(settings=settings)
@@ -115,12 +113,11 @@ def test_main_reports_failed_codes_and_returns_nonzero():
     notifications: list[str] = []
     settings = Settings(
         tushare_token="token",
-        dify_api_key="api",
         feishu_webhook="https://example.com",
-        dify_base_url="https://api.dify.ai/v1",
         debug_mode=True,
         my_stocks=["000001.SZ", "000002.SZ"],
         allowed_exchanges=("SH", "SZ", "BJ"),
+        llm_api_key="llm-key",
     )
 
     def fake_fetcher(code, settings):
@@ -178,12 +175,11 @@ def test_main_skips_codes_filtered_by_exchange_without_failing():
     calls: list[str] = []
     settings = Settings(
         tushare_token="token",
-        dify_api_key="api",
         feishu_webhook="https://example.com",
-        dify_base_url="https://api.dify.ai/v1",
         debug_mode=True,
         my_stocks=["000001.SZ", "430001.BJ"],
         allowed_exchanges=("SH", "SZ"),
+        llm_api_key="llm-key",
     )
 
     def fake_fetcher(code, settings):
@@ -209,3 +205,45 @@ def test_main_skips_codes_filtered_by_exchange_without_failing():
 
     assert exit_code == 0
     assert calls == ["fetch:000001.SZ", "analyze:000001.SZ:100", "notify:1"]
+
+
+def test_main_skips_llm_when_local_score_below_threshold(monkeypatch):
+    calls: list[str] = []
+    settings = make_settings()
+
+    def fake_fetcher(code, settings):
+        payload = make_strong_payload()
+        payload["latest"]["ts_code"] = code
+        return payload
+
+    def fake_analyzer(stock_data, tech_result, stock_code, settings):
+        calls.append("analyze-called")
+        return "analysis-result"
+
+    def fake_notifier(content, settings):
+        calls.append(content)
+        return True
+
+    monkeypatch.setattr(
+        "tradeeye.app.check_signals",
+        lambda _data: {
+            "score": 60,
+            "status": "local-only",
+            "detail": "low confidence",
+            "risk": "avoid overnight",
+            "action_plan": "watchlist",
+        },
+    )
+
+    exit_code = main(
+        settings=settings,
+        data_fetcher=fake_fetcher,
+        analyzer=fake_analyzer,
+        notifier=fake_notifier,
+    )
+
+    assert exit_code == 0
+    assert "analyze-called" not in calls
+    assert len(calls) == 1
+    assert "本地得分: 60" in calls[0]
+    assert "未调用 LLM 分析" in calls[0]

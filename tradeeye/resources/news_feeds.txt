@@ -1,0 +1,12 @@
+# One feed URL per line. Lines starting with # are ignored.
+# You can keep this file in repo and override with NEWS_RSS_FEEDS env in CI.
+#
+# Domestic power/energy feeds (RSS verified as of 2026-05-19).
+# Note: Eastmoney currently does not expose a stable public RSS feed endpoint.
+https://www.in-en.com/feed/rss.php?mid=24
+https://www.in-en.com/feed/rss.php?mid=37
+https://www.in-en.com/feed/rss.php?mid=34
+https://www.in-en.com/feed/rss.php?mid=33
+https://www.in-en.com/feed/rss.php?mid=27
+https://www.in-en.com/feed/rss.php?mid=28
+https://www.chinanews.com.cn/rss/finance.xml

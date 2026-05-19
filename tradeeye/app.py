@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import datetime as dt
 import logging
@@ -6,7 +6,7 @@ from typing import Any, Callable, Optional
 
 from tradeeye.config import Settings, load_settings, split_stocks_by_exchange
 from tradeeye.logging_utils import configure_logging
-from tradeeye.services.analysis import get_dify_analysis
+from tradeeye.services.analysis import get_llm_analysis
 from tradeeye.services.data import get_clean_data
 from tradeeye.services.notifier import send_report
 from tradeeye.strategies.strategy import check_signals
@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 DataFetcher = Callable[[str, Settings], Optional[dict[str, Any]]]
 Analyzer = Callable[[dict[str, Any], dict[str, Any], str, Settings], str]
 Notifier = Callable[[str, Settings], bool]
+LLM_SCORE_THRESHOLD = 70
 
 
 def build_final_content(
@@ -29,19 +30,19 @@ def build_final_content(
     if reports:
         sections.append("\n\n".join(reports))
     else:
-        sections.append("\u4eca\u65e5\u65e0\u6709\u6548\u4e2a\u80a1\u5206\u6790\u7ed3\u679c\u3002")
+        sections.append("今日无有效个股分析结果。")
 
     if failed_codes:
         failed_list = "\n".join(f"- {code}" for code in failed_codes)
-        sections.append(f"\u4ee5\u4e0b\u6807\u7684\u83b7\u53d6\u6216\u5206\u6790\u5931\u8d25\uff1a\n{failed_list}")
+        sections.append(f"以下标的获取或分析失败：\n{failed_list}")
 
-    return f"\U0001f4ca {today} \u4e2a\u80a1\u590d\u76d8\u6c47\u603b\u62a5\u544a\uff1a\n\n" + "\n\n".join(sections)
+    return f"📊 {today} 个股复盘汇总报告：\n\n" + "\n\n".join(sections)
 
 
 def main(
     settings: Settings | None = None,
     data_fetcher: DataFetcher = get_clean_data,
-    analyzer: Analyzer = get_dify_analysis,
+    analyzer: Analyzer = get_llm_analysis,
     notifier: Notifier = send_report,
 ) -> int:
     settings = settings or load_settings()
@@ -75,10 +76,22 @@ def main(
             continue
 
         tech_result = check_signals(data)
-        logger.info("Requesting AI analysis for %s (%s)", data.get("name"), code)
-        ai_analysis = analyzer(data, tech_result, code, settings)
-        all_reports.append(ai_analysis)
-        logger.info("Analysis completed for %s (%s)", data.get("name"), code)
+        score = _safe_score(tech_result.get("score"))
+        if score >= LLM_SCORE_THRESHOLD:
+            logger.info("Requesting AI analysis for %s (%s), score=%s", data.get("name"), code, score)
+            ai_analysis = analyzer(data, tech_result, code, settings)
+            all_reports.append(ai_analysis)
+            logger.info("Analysis completed for %s (%s)", data.get("name"), code)
+            continue
+
+        logger.info(
+            "Skipping AI analysis for %s (%s): local score=%s below threshold=%s",
+            data.get("name"),
+            code,
+            score,
+            LLM_SCORE_THRESHOLD,
+        )
+        all_reports.append(_build_local_report(data, tech_result, code))
 
     if not all_reports:
         logger.warning("No valid stock data available for today")
@@ -94,3 +107,26 @@ def main(
         return 1
 
     return 0
+
+
+def _build_local_report(stock_data: dict[str, Any], tech_result: dict[str, Any], stock_code: str) -> str:
+    name = stock_data.get("name") or stock_code
+    trade_date = stock_data.get("trade_date") or "unknown"
+    return (
+        f"【{name} ({stock_code})】\n"
+        f"交易日: {trade_date}\n"
+        f"本地得分: {_safe_score(tech_result.get('score'))}\n"
+        f"状态: {tech_result.get('status', '')}\n"
+        f"理由: {tech_result.get('detail', '')}\n"
+        f"风险: {tech_result.get('risk', '')}\n"
+        f"执行建议: {tech_result.get('action_plan', '')}\n"
+        "说明：本地得分未达阈值，未调用 LLM 分析。"
+    )
+
+
+def _safe_score(value: Any) -> int:
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return 0
+

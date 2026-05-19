@@ -20,7 +20,10 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
-      DIFY_API_KEY: ${{ secrets.DIFY_API_KEY }}
+      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+      LLM_BASE_URL: ${{ vars.LLM_BASE_URL || 'https://api.deepseek.com' }}
+      LLM_MODEL: ${{ vars.LLM_MODEL || 'deepseek-v4-flash' }}
+      LLM_TIMEOUT_SEC: ${{ vars.LLM_TIMEOUT_SEC || '60' }}
       FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
       RECOMMENDER_INDUSTRIES: ${{ vars.RECOMMENDER_INDUSTRIES }}
       DEBUG_MODE: "false"

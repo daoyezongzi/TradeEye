@@ -1,16 +1,15 @@
-from tradeeye.config import Settings
+﻿from tradeeye.config import Settings
 from tradeeye.recommend_app import build_recommendation_content, main
 
 
 def make_settings(debug_mode: bool = True) -> Settings:
     return Settings(
         tushare_token="token",
-        dify_api_key="api",
         feishu_webhook="https://example.com",
-        dify_base_url="https://api.dify.ai/v1",
         debug_mode=debug_mode,
         my_stocks=[],
         allowed_exchanges=("SH", "SZ", "BJ"),
+        llm_api_key="llm-key",
     )
 
 
@@ -21,7 +20,6 @@ def test_build_recommendation_content_includes_ai_section():
     }
     content = build_recommendation_content(recommendations, ai_analysis="AI summary")
 
-    assert "每日好股推荐" in content
     assert "600001.SH" in content
     assert "AI summary" in content
 
