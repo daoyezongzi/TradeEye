@@ -21,6 +21,8 @@ def test_build_recommendation_content_includes_ai_section():
     content = build_recommendation_content(recommendations, ai_analysis="AI summary")
 
     assert "600001.SH" in content
+    assert "每日好股推荐" in content
+    assert "LLM 分析：" in content
     assert "AI summary" in content
 
 

@@ -28,7 +28,7 @@ def build_recommendation_content(
 ) -> str:
     date_text = (report_date or dt.date.today()).strftime("%Y-%m-%d")
     brief = build_recommendation_brief(recommendations)
-    return f"{date_text} 姣忔棩濂借偂鎺ㄨ崘\n\n{brief}\n\nLLM 鍒嗘瀽锛歕n{ai_analysis}"
+    return f"{date_text} 每日好股推荐\n\n{brief}\n\nLLM 分析：\n{ai_analysis}"
 
 
 def main(
