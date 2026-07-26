@@ -1,0 +1,37 @@
+# TradeEye 策略规则参数。改这里即可调参，不用改代码。
+# 缺失的键自动回退代码内默认值。可用环境变量 TRADEEYE_RULES_FILE 指向其他文件做参数实验。
+analysis:
+  llm_score_threshold: 70          # 本地得分 >= 此值才调用 LLM
+  status_bands: {strong: 80, candidate: 65, watch: 50}
+  rules:
+    market_regime: {strong_min: 15, strong_score: 10, weak_max: -15, weak_penalty: -15}
+    ma_alignment: {full_score: 18, mid_score: 12, weak_score: 6, fail_penalty: -10}
+    ma5_slope: {up_min: 0.2, up_score: 4, down_max: -0.2, down_penalty: -4}
+    close_strength: {strong_min: 0.8, strong_score: 18, mid_min: 0.68, mid_score: 10,
+                     weak_max: 0.45, weak_penalty: -15}
+    pct_chg: {sweet_min: 1.2, sweet_max: 6.5, sweet_score: 12, mild_score: 5,
+              weak_max: -1.5, weak_penalty: -18, hot_min: 8, hot_penalty: -12}
+    candle_body: {bull_score: 8, bear_penalty: -4}
+    upper_shadow: {short_max: 1.2, short_score: 6, long_min: 2.5, long_penalty: -10}
+    turnover: {sweet_min: 2, sweet_max: 12, sweet_score: 10, ok_min: 0.8, ok_score: 4,
+               hot_min: 18, hot_penalty: -8, cold_penalty: -8}
+    amount_ratio_5d: {sweet_min: 1.2, sweet_max: 3, sweet_score: 10,
+                      hot_min: 4, hot_penalty: -6, cold_max: 0.8, cold_penalty: -6}
+    volume_ratio: {sweet_min: 1, sweet_max: 2.5, sweet_score: 8,
+                   hot_min: 4, hot_penalty: -4, cold_max: 0.6, cold_penalty: -4}
+    net_mf: {strong_min: 3, strong_score: 14, ok_min: 1, ok_score: 8,
+             weak_max: -2, weak_penalty: -14}
+    large_order: {strong_min: 2, strong_score: 12, ok_min: 0.5, ok_score: 6,
+                  weak_max: -1, weak_penalty: -12}
+    breakout: {sweet_min: -1, sweet_max: 2.5, sweet_score: 8, far_max: -3, far_penalty: -8}
+    up_limit_room: {sweet_min: 2, sweet_max: 7, sweet_score: 6, near_max: 1.2, near_penalty: -10}
+    ranks: {turnover_rank_min: 0.75, turnover_rank_score: 4,
+            net_mf_rank_min: 0.8, net_mf_rank_score: 4,
+            large_order_rank_min: 0.8, large_order_rank_score: 4}
+    penalties: {st_penalty: -40, new_stock_age_days: 120, new_stock_penalty: -25, bj_penalty: -20}
+recommender:
+  short_burst: {volume_ratio_min: 2.0, turnover_min: 5.0, turnover_max: 15.0, pct_chg_min: 2.0}
+  t_active: {amplitude_min: 4.5, amount_min: 500000}
+  long_value: {pe_rank_max: 0.4, mv_rank_min: 0.8}
+  weights: {short_burst: 0.4, t_active: 0.3, long_value: 0.3, multi_dim_bonus: 4}
+  price_ranges: {low: [0, 10], mid: [10, 20]}

@@ -59,6 +59,13 @@ def test_load_rules_invalid_value_type_ignored(tmp_path):
     assert load_rules(yaml_file) == Rules()
 
 
+def test_packaged_rules_yaml_exists_and_matches_defaults():
+    from tradeeye.strategies.rules import DEFAULT_RULES_FILE
+
+    assert DEFAULT_RULES_FILE.exists()
+    assert load_rules(DEFAULT_RULES_FILE) == Rules()
+
+
 def test_load_rules_env_override(tmp_path, monkeypatch):
     yaml_file = tmp_path / "custom.yaml"
     yaml_file.write_text("analysis: {llm_score_threshold: 60}\n", encoding="utf-8")
