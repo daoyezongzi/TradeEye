@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
-import yaml
+from tradeeye.strategies.rules import AnalysisRules, get_rules
 
 
-def check_signals(data: dict[str, Any]) -> dict[str, Any]:
+def check_signals(data: dict[str, Any], rules: AnalysisRules | None = None) -> dict[str, Any]:
     if not data or "latest" not in data or "prev" not in data:
         return {
             "score": 0,
@@ -24,6 +23,9 @@ def check_signals(data: dict[str, Any]) -> dict[str, Any]:
             "market_bias": "未知",
             "action_plan": "跳过本次分析。",
         }
+
+    rules = rules or get_rules().analysis
+    r = rules.rules
 
     latest = data["latest"]
     prev = data["prev"]
@@ -55,178 +57,178 @@ def check_signals(data: dict[str, Any]) -> dict[str, Any]:
     ts_code = str(latest.get("ts_code") or "")
     board_name = str(latest.get("market") or "")
 
-    score = 0
+    score = 0.0
     reasons: list[str] = []
     risks: list[str] = []
 
-    if market_score >= 15:
-        score += 10
+    if market_score >= r.market_regime.strong_min:
+        score += r.market_regime.strong_score
         reasons.append("市场收盘情绪偏强")
-    elif market_score <= -15:
-        score -= 15
+    elif market_score <= r.market_regime.weak_max:
+        score += r.market_regime.weak_penalty
         risks.append("全市场收盘偏弱，隔夜溢价容易被压缩")
 
     if close > ma5 > ma10 > ma20 and ma20 > 0:
-        score += 18
+        score += r.ma_alignment.full_score
         reasons.append("收盘位于多头均线之上")
     elif close > ma5 > ma10 and ma10 > 0:
-        score += 12
+        score += r.ma_alignment.mid_score
         reasons.append("短线均线保持上拐")
     elif close > ma5 and ma5 > 0:
-        score += 6
+        score += r.ma_alignment.weak_score
         reasons.append("收盘仍守住短均线")
     else:
-        score -= 10
+        score += r.ma_alignment.fail_penalty
         risks.append("收盘失守短均线")
 
-    if ma5_slope_pct > 0.2:
-        score += 4
+    if ma5_slope_pct > r.ma5_slope.up_min:
+        score += r.ma5_slope.up_score
         reasons.append("MA5 继续抬升")
-    elif ma5_slope_pct < -0.2:
-        score -= 4
+    elif ma5_slope_pct < r.ma5_slope.down_max:
+        score += r.ma5_slope.down_penalty
         risks.append("MA5 走平转弱")
 
-    if close_strength >= 0.8:
-        score += 18
+    if close_strength >= r.close_strength.strong_min:
+        score += r.close_strength.strong_score
         reasons.append("收盘靠近日内高位，尾盘承接较强")
-    elif close_strength >= 0.68:
-        score += 10
+    elif close_strength >= r.close_strength.mid_min:
+        score += r.close_strength.mid_score
         reasons.append("收盘位置偏强")
-    elif close_strength < 0.45:
-        score -= 15
+    elif close_strength < r.close_strength.weak_max:
+        score += r.close_strength.weak_penalty
         risks.append("收盘位置偏低，尾盘不够强")
 
-    if 1.2 <= pct_chg <= 6.5:
-        score += 12
+    if r.pct_chg.sweet_min <= pct_chg <= r.pct_chg.sweet_max:
+        score += r.pct_chg.sweet_score
         reasons.append("涨幅适中，兼顾动能和次日空间")
-    elif 0 < pct_chg < 1.2:
-        score += 5
+    elif 0 < pct_chg < r.pct_chg.sweet_min:
+        score += r.pct_chg.mild_score
         reasons.append("日内温和走强")
-    elif pct_chg < -1.5:
-        score -= 18
+    elif pct_chg < r.pct_chg.weak_max:
+        score += r.pct_chg.weak_penalty
         risks.append("收盘偏弱，不适合做隔夜")
-    elif pct_chg > 8:
-        score -= 12
+    elif pct_chg > r.pct_chg.hot_min:
+        score += r.pct_chg.hot_penalty
         risks.append("涨幅过大，次日追高风险高")
 
     if close > open_price:
-        score += 8
+        score += r.candle_body.bull_score
         reasons.append("实体收阳")
     else:
-        score -= 4
+        score += r.candle_body.bear_penalty
         risks.append("收盘未能站上开盘价")
 
-    if upper_shadow_pct <= 1.2:
-        score += 6
+    if upper_shadow_pct <= r.upper_shadow.short_max:
+        score += r.upper_shadow.short_score
         reasons.append("上影线短，抛压可控")
-    elif upper_shadow_pct > 2.5:
-        score -= 10
+    elif upper_shadow_pct > r.upper_shadow.long_min:
+        score += r.upper_shadow.long_penalty
         risks.append("上影较长，尾盘抛压偏重")
 
-    if 2 <= turnover_rate <= 12:
-        score += 10
+    if r.turnover.sweet_min <= turnover_rate <= r.turnover.sweet_max:
+        score += r.turnover.sweet_score
         reasons.append("换手处于短线舒适区间")
-    elif 0.8 <= turnover_rate < 2:
-        score += 4
+    elif r.turnover.ok_min <= turnover_rate < r.turnover.sweet_min:
+        score += r.turnover.ok_score
         reasons.append("换手合格但不算活跃")
-    elif turnover_rate > 18:
-        score -= 8
+    elif turnover_rate > r.turnover.hot_min:
+        score += r.turnover.hot_penalty
         risks.append("换手过热，隔夜一致性风险升高")
     else:
-        score -= 8
+        score += r.turnover.cold_penalty
         risks.append("换手不足，次日兑现流动性偏弱")
 
-    if 1.2 <= amount_ratio_5d <= 3:
-        score += 10
+    if r.amount_ratio_5d.sweet_min <= amount_ratio_5d <= r.amount_ratio_5d.sweet_max:
+        score += r.amount_ratio_5d.sweet_score
         reasons.append("成交额较近五日明显放大")
-    elif amount_ratio_5d > 4:
-        score -= 6
+    elif amount_ratio_5d > r.amount_ratio_5d.hot_min:
+        score += r.amount_ratio_5d.hot_penalty
         risks.append("放量过猛，容易透支次日空间")
-    elif 0 < amount_ratio_5d < 0.8:
-        score -= 6
+    elif 0 < amount_ratio_5d < r.amount_ratio_5d.cold_max:
+        score += r.amount_ratio_5d.cold_penalty
         risks.append("成交额未放大，尾盘跟风不足")
 
-    if 1 <= volume_ratio <= 2.5:
-        score += 8
+    if r.volume_ratio.sweet_min <= volume_ratio <= r.volume_ratio.sweet_max:
+        score += r.volume_ratio.sweet_score
         reasons.append("量比配合合理")
-    elif volume_ratio > 4:
-        score -= 4
+    elif volume_ratio > r.volume_ratio.hot_min:
+        score += r.volume_ratio.hot_penalty
         risks.append("量比过高，波动容易失真")
-    elif 0 < volume_ratio < 0.6:
-        score -= 4
+    elif 0 < volume_ratio < r.volume_ratio.cold_max:
+        score += r.volume_ratio.cold_penalty
         risks.append("量比偏低，主动资金不明显")
 
-    if net_mf_ratio_pct >= 3:
-        score += 14
+    if net_mf_ratio_pct >= r.net_mf.strong_min:
+        score += r.net_mf.strong_score
         reasons.append("资金净流入占成交额较高")
-    elif net_mf_ratio_pct >= 1:
-        score += 8
+    elif net_mf_ratio_pct >= r.net_mf.ok_min:
+        score += r.net_mf.ok_score
         reasons.append("资金净流入为正")
-    elif net_mf_ratio_pct <= -2:
-        score -= 14
+    elif net_mf_ratio_pct <= r.net_mf.weak_max:
+        score += r.net_mf.weak_penalty
         risks.append("资金净流出明显")
 
-    if large_order_net_pct >= 2:
-        score += 12
+    if large_order_net_pct >= r.large_order.strong_min:
+        score += r.large_order.strong_score
         reasons.append("大单承接占优")
-    elif large_order_net_pct >= 0.5:
-        score += 6
+    elif large_order_net_pct >= r.large_order.ok_min:
+        score += r.large_order.ok_score
         reasons.append("大单净额为正")
-    elif large_order_net_pct <= -1:
-        score -= 12
+    elif large_order_net_pct <= r.large_order.weak_max:
+        score += r.large_order.weak_penalty
         risks.append("大单流出，次日承接需谨慎")
 
-    if -1 <= breakout_pct <= 2.5:
-        score += 8
+    if r.breakout.sweet_min <= breakout_pct <= r.breakout.sweet_max:
+        score += r.breakout.sweet_score
         reasons.append("接近或小幅突破近十日高点")
-    elif breakout_pct < -3:
-        score -= 8
+    elif breakout_pct < r.breakout.far_max:
+        score += r.breakout.far_penalty
         risks.append("距离近十日高点偏远，动能不足")
 
-    if 2 <= up_limit_room_pct <= 7:
-        score += 6
+    if r.up_limit_room.sweet_min <= up_limit_room_pct <= r.up_limit_room.sweet_max:
+        score += r.up_limit_room.sweet_score
         reasons.append("距离涨停仍有合理空间")
-    elif 0 < up_limit_room_pct < 1.2:
-        score -= 10
+    elif 0 < up_limit_room_pct < r.up_limit_room.near_max:
+        score += r.up_limit_room.near_penalty
         risks.append("离涨停过近，但无竞价/封单权限确认强度")
 
-    if turnover_pct_rank >= 0.75:
-        score += 4
+    if turnover_pct_rank >= r.ranks.turnover_rank_min:
+        score += r.ranks.turnover_rank_score
         reasons.append("换手位于市场前列")
-    if net_mf_ratio_rank >= 0.8:
-        score += 4
+    if net_mf_ratio_rank >= r.ranks.net_mf_rank_min:
+        score += r.ranks.net_mf_rank_score
         reasons.append("资金净流入强于多数个股")
-    if large_order_net_rank >= 0.8:
-        score += 4
+    if large_order_net_rank >= r.ranks.large_order_rank_min:
+        score += r.ranks.large_order_rank_score
         reasons.append("大单承接强于多数个股")
 
     if "ST" in stock_name.upper():
-        score -= 40
+        score += r.penalties.st_penalty
         risks.append("ST 标的隔夜波动不可控")
-    if list_age_days and list_age_days < 120:
-        score -= 25
-        risks.append("上市未满 120 天，历史样本不足")
+    if list_age_days and list_age_days < r.penalties.new_stock_age_days:
+        score += r.penalties.new_stock_penalty
+        risks.append(f"上市未满 {r.penalties.new_stock_age_days} 天，历史样本不足")
     if ts_code.endswith(".BJ") or "北交所" in board_name:
-        score -= 20
+        score += r.penalties.bj_penalty
         risks.append("北交所标的次日流动性与滑点风险偏大")
 
-    score = max(0, min(100, score))
+    final_score = int(round(max(0.0, min(100.0, score))))
     risk_text = "；".join(dict.fromkeys(risks)) if risks else "无显著额外风险"
     detail_text = " + ".join(dict.fromkeys(reasons)) if reasons else "缺少足够的尾盘强势信号"
 
-    if score >= 80:
+    if final_score >= rules.status_bands.strong:
         status = "【强候选】尾盘隔夜"
-    elif score >= 65:
+    elif final_score >= rules.status_bands.candidate:
         status = "【候选】可跟踪"
-    elif score >= 50:
+    elif final_score >= rules.status_bands.watch:
         status = "【观察】等待更优确认"
     else:
         status = "【回避】"
 
-    action_plan = _build_action_plan(score, market_score, up_limit_room_pct, pct_chg)
+    action_plan = _build_action_plan(final_score, market_score, up_limit_room_pct, pct_chg, rules)
 
     return {
-        "score": score,
+        "score": final_score,
         "status": status,
         "detail": detail_text,
         "risk": risk_text,
@@ -243,27 +245,26 @@ def check_signals(data: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def load_yaml_config(strategy_name: str = "shrink_pullback") -> dict[str, Any]:
-    yaml_path = Path(__file__).with_name(f"{strategy_name}.yaml")
-    if yaml_path.exists():
-        with yaml_path.open("r", encoding="utf-8") as file_obj:
-            return yaml.safe_load(file_obj)
-    return {}
-
-
-def _build_action_plan(score: int, market_score: float, up_limit_room_pct: float, pct_chg: float) -> str:
-    if score >= 80:
+def _build_action_plan(
+    score: int,
+    market_score: float,
+    up_limit_room_pct: float,
+    pct_chg: float,
+    rules: AnalysisRules,
+) -> str:
+    r = rules.rules
+    if score >= rules.status_bands.strong:
         base = "轻仓参与隔夜，不追临近涨停的尾盘拉板；次日若高开 2% 到 4% 优先分批兑现。"
-    elif score >= 65:
+    elif score >= rules.status_bands.candidate:
         base = "仅列入尾盘观察名单，必须确认尾盘强势未衰减再考虑；次日优先快进快出。"
-    elif score >= 50:
+    elif score >= rules.status_bands.watch:
         base = "只观察，不建议机械买入。"
     else:
         return "放弃本次隔夜交易，等待更强的收盘结构与资金确认。"
 
-    if market_score <= -15:
+    if market_score <= r.market_regime.weak_max:
         base += " 市场环境偏弱，仓位需要再降一档。"
-    if 0 < up_limit_room_pct < 1.2 or pct_chg > 8:
+    if 0 < up_limit_room_pct < r.up_limit_room.near_max or pct_chg > r.pct_chg.hot_min:
         base += " 该股过于贴近涨停，因缺少竞价与封单权限，不宜重仓。"
 
     base += " 若次日开盘弱于昨收约 1.5%，优先止损，不做日内扛单。"

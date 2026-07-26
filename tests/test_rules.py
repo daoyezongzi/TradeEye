@@ -71,3 +71,24 @@ def test_load_rules_env_override(tmp_path, monkeypatch):
     yaml_file.write_text("analysis: {llm_score_threshold: 60}\n", encoding="utf-8")
     monkeypatch.setenv("TRADEEYE_RULES_FILE", str(yaml_file))
     assert load_rules().analysis.llm_score_threshold == 60
+
+
+def test_check_signals_respects_rule_overrides():
+    from dataclasses import replace
+
+    from tradeeye.strategies.rules import AnalysisRules, StatusBands
+    from tradeeye.strategies.strategy import check_signals
+
+    data = {
+        "name": "Test Co",
+        "market_regime": {"status": "中性", "score": 0},
+        "latest": {"close": 10.5, "open": 10.0, "ma5": 10.2, "ma10": 10.0, "ma20": 9.8,
+                   "pct_chg": 2.0, "close_strength": 0.9, "list_age_days": 600},
+        "prev": {"low": 9.7},
+    }
+    default_result = check_signals(data, rules=AnalysisRules())
+    # 把强候选门槛降到 1 分，status 应变为强候选
+    lowered = replace(AnalysisRules(), status_bands=StatusBands(strong=1, candidate=0, watch=0))
+    lowered_result = check_signals(data, rules=lowered)
+    assert default_result["status"] != lowered_result["status"]
+    assert lowered_result["status"] == "【强候选】尾盘隔夜"
