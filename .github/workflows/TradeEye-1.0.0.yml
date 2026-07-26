@@ -15,6 +15,9 @@ on:
           - recommend
           - analysis
 
+permissions:
+  contents: write
+
 jobs:
   trade_eye_job:
     runs-on: ubuntu-latest
@@ -68,3 +71,17 @@ jobs:
           (github.event_name == 'schedule' && github.event.schedule == '30 7 * * 1-5') ||
           (github.event_name == 'workflow_dispatch' && github.event.inputs.job_type == 'analysis')
         run: python main.py
+
+      - name: Commit signal data
+        shell: bash
+        run: |
+          if [ -z "$(git status --porcelain data/signals/ 2>/dev/null)" ]; then
+            echo "No signal changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/signals/
+          git commit -m "chore: record signals $(date -u +%Y-%m-%d) [skip ci]"
+          git pull --rebase origin main
+          git push origin HEAD:main || (git pull --rebase origin main && git push origin HEAD:main)

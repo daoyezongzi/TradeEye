@@ -5,6 +5,7 @@ TradeEye is a stock review automation project with three workflows:
 - `analysis`: stock review (local scoring + optional LLM explanation) -> Feishu push
 - `recommend`: grouped candidate recommendation + LLM explanation -> Feishu push
 - `news`: RSS finance digest -> Feishu push
+- `backtest`: weekly win-rate report of recorded signals -> Feishu push
 
 ## Fastest Path (Recommended)
 
@@ -73,6 +74,7 @@ This repo has two workflow files:
 
 - `.github/workflows/TradeEye-1.0.0.yml` for `analysis` + `recommend`
 - `.github/workflows/TradeEye-news-1.0.0.yml` for `news`
+- `.github/workflows/TradeEye-backtest-1.0.0.yml` for weekly `backtest`
 
 Set GitHub **Secrets**:
 
@@ -93,6 +95,7 @@ Optional GitHub **Variables**:
 - `recommend`: `0 22 * * 0-4` (UTC), around China `06:00` weekdays
 - `analysis`: `30 7 * * 1-5` (UTC), around China `15:30` weekdays
 - `news`: `30 23 * * 0-4` (UTC), around China `07:30` weekdays
+- `backtest`: `30 10 * * 5` (UTC), around China Friday `18:30`
 
 You can also run manually from GitHub Actions `workflow_dispatch`.
 
@@ -104,6 +107,9 @@ You can also run manually from GitHub Actions `workflow_dispatch`.
 - `score < 70`: local template output only, skip LLM
 
 This reduces API usage while preserving strong-signal explanations.
+
+Scoring thresholds and weights live in `tradeeye/strategies/rules.yaml`.
+Daily signals are appended to `data/signals/*.csv` by CI for the weekly backtest.
 
 ## Environment Variables
 
@@ -126,6 +132,8 @@ This reduces API usage while preserving strong-signal explanations.
 - `NEWS_PUSH_WHEN_EMPTY`
 - `NEWS_TEMPLATE_FILE`
 - `UPLOAD_EXCLUDE_PATTERNS`
+- `BACKTEST_LOOKBACK_DAYS`
+- `TRADEEYE_RULES_FILE`
 
 ## Validation
 
