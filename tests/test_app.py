@@ -88,6 +88,7 @@ def test_main_runs_end_to_end_with_injected_services():
         data_fetcher=fake_fetcher,
         analyzer=fake_analyzer,
         notifier=fake_notifier,
+        signal_recorder=lambda rows: True,
     )
 
     assert exit_code == 0
@@ -139,6 +140,7 @@ def test_main_reports_failed_codes_and_returns_nonzero():
         data_fetcher=fake_fetcher,
         analyzer=fake_analyzer,
         notifier=fake_notifier,
+        signal_recorder=lambda rows: True,
     )
 
     assert exit_code == 1
@@ -166,6 +168,7 @@ def test_main_returns_nonzero_when_notification_fails():
         data_fetcher=fake_fetcher,
         analyzer=fake_analyzer,
         notifier=fake_notifier,
+        signal_recorder=lambda rows: True,
     )
 
     assert exit_code == 1
@@ -201,6 +204,7 @@ def test_main_skips_codes_filtered_by_exchange_without_failing():
         data_fetcher=fake_fetcher,
         analyzer=fake_analyzer,
         notifier=fake_notifier,
+        signal_recorder=lambda rows: True,
     )
 
     assert exit_code == 0
@@ -240,6 +244,7 @@ def test_main_skips_llm_when_local_score_below_threshold(monkeypatch):
         data_fetcher=fake_fetcher,
         analyzer=fake_analyzer,
         notifier=fake_notifier,
+        signal_recorder=lambda rows: True,
     )
 
     assert exit_code == 0
@@ -272,8 +277,30 @@ def test_main_llm_threshold_from_rules(monkeypatch, tmp_path):
         data_fetcher=fake_fetcher,
         analyzer=fake_analyzer,
         notifier=lambda content, settings: True,
+        signal_recorder=lambda rows: True,
     )
 
     rules_module.get_rules.cache_clear()
     assert result == 0
     assert analyzer_calls == []
+
+
+def test_main_records_signals_for_scored_stocks():
+    recorded = []
+
+    result = main(
+        settings=make_settings(),
+        data_fetcher=lambda code, settings: make_strong_payload() | {"trade_date": "20260724"},
+        analyzer=lambda data, tech_result, code, settings: "AI report",
+        notifier=lambda content, settings: True,
+        signal_recorder=lambda rows: recorded.extend(rows) or True,
+    )
+
+    assert result == 0
+    assert len(recorded) == 1
+    row = recorded[0]
+    assert row["date"] == "20260724"
+    assert row["ts_code"] == "000001.SZ"
+    assert row["close"] == 10.4
+    assert isinstance(row["score"], int)
+    assert isinstance(row["called_llm"], bool)

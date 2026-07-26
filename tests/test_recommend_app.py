@@ -55,7 +55,36 @@ def test_recommend_main_runs_end_to_end_with_injected_services():
         analyzer=fake_analyzer,
         notifier=fake_notifier,
         top_n=5,
+        signal_recorder=lambda rows: True,
     )
 
     assert exit_code == 0
     assert calls == ["recommend:5", "analyze", "notify"]
+
+
+def test_main_records_recommend_signals():
+    recorded = []
+    recommendations = {
+        "low_price_group": [
+            {"trade_date": "20260724", "ts_code": "600001.SH", "name": "Alpha", "close": 9.8,
+             "total_score": 70.5, "dimensions": ["short_burst", "t_active"]},
+        ],
+        "mid_price_group": [
+            {"trade_date": "20260724", "ts_code": "600002.SH", "name": "Beta", "close": 15.2,
+             "total_score": 66.0, "dimensions": ["t_active"]},
+        ],
+    }
+
+    result = main(
+        settings=make_settings(),
+        recommender=lambda settings, top_n: recommendations,
+        analyzer=lambda payload, settings: "AI analysis",
+        notifier=lambda content, settings: True,
+        signal_recorder=lambda rows: recorded.extend(rows) or True,
+    )
+
+    assert result == 0
+    assert len(recorded) == 2
+    assert recorded[0]["price_group"] == "low_price_group"
+    assert recorded[0]["dimensions"] == "short_burst|t_active"
+    assert recorded[1]["ts_code"] == "600002.SH"

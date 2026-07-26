@@ -9,6 +9,7 @@ from tradeeye.logging_utils import configure_logging
 from tradeeye.services.analysis import get_llm_analysis
 from tradeeye.services.data import get_clean_data
 from tradeeye.services.notifier import send_report
+from tradeeye.services.signal_store import append_analysis_signals
 from tradeeye.strategies.rules import get_rules
 from tradeeye.strategies.strategy import check_signals
 
@@ -44,6 +45,7 @@ def main(
     data_fetcher: DataFetcher = get_clean_data,
     analyzer: Analyzer = get_llm_analysis,
     notifier: Notifier = send_report,
+    signal_recorder: Callable[[list[dict[str, Any]]], bool] = append_analysis_signals,
 ) -> int:
     settings = settings or load_settings()
     configure_logging(settings.debug_mode)
@@ -58,6 +60,7 @@ def main(
     llm_score_threshold = get_rules().analysis.llm_score_threshold
     all_reports: list[str] = []
     failed_codes: list[str] = []
+    signal_rows: list[dict[str, Any]] = []
     selected_codes, excluded_codes = split_stocks_by_exchange(settings.my_stocks, settings.allowed_exchanges)
     if excluded_codes:
         logger.info(
@@ -78,6 +81,17 @@ def main(
 
         tech_result = check_signals(data)
         score = _safe_score(tech_result.get("score"))
+        signal_rows.append(
+            {
+                "date": data.get("trade_date", ""),
+                "ts_code": code,
+                "name": data.get("name", ""),
+                "score": score,
+                "status": tech_result.get("status", ""),
+                "close": data.get("latest", {}).get("close", ""),
+                "called_llm": score >= llm_score_threshold,
+            }
+        )
         if score >= llm_score_threshold:
             logger.info("Requesting AI analysis for %s (%s), score=%s", data.get("name"), code, score)
             ai_analysis = analyzer(data, tech_result, code, settings)
@@ -93,6 +107,9 @@ def main(
             llm_score_threshold,
         )
         all_reports.append(_build_local_report(data, tech_result, code))
+
+    if signal_rows:
+        signal_recorder(signal_rows)
 
     if not all_reports:
         logger.warning("No valid stock data available for today")

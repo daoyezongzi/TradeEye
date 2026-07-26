@@ -8,6 +8,7 @@ from tradeeye.config import Settings, load_settings
 from tradeeye.logging_utils import configure_logging
 from tradeeye.services.analysis import get_llm_recommendation_analysis
 from tradeeye.services.notifier import send_report
+from tradeeye.services.signal_store import append_recommend_signals
 from tradeeye.strategies.stock_recommender import (
     build_recommendation_brief,
     recommendations_to_json,
@@ -37,11 +38,15 @@ def main(
     analyzer: Analyzer = get_llm_recommendation_analysis,
     notifier: Notifier = send_report,
     top_n: int = 5,
+    signal_recorder: Callable[[list[dict[str, Any]]], bool] = append_recommend_signals,
 ) -> int:
     settings = settings or load_settings()
     configure_logging(settings.debug_mode)
 
     recommendations = recommender(settings, top_n)
+    signal_rows = _build_signal_rows(recommendations)
+    if signal_rows:
+        signal_recorder(signal_rows)
     if not _has_recommendations(recommendations):
         logger.warning("No recommendation candidates generated")
         content = build_recommendation_content(
@@ -62,5 +67,23 @@ def main(
 
 def _has_recommendations(recommendations: dict[str, list[dict[str, Any]]]) -> bool:
     return bool(recommendations.get("low_price_group") or recommendations.get("mid_price_group"))
+
+
+def _build_signal_rows(recommendations: dict[str, list[dict[str, Any]]]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for group_key in ("low_price_group", "mid_price_group"):
+        for item in recommendations.get(group_key, []):
+            rows.append(
+                {
+                    "date": item.get("trade_date", ""),
+                    "ts_code": item.get("ts_code", ""),
+                    "name": item.get("name", ""),
+                    "price_group": group_key,
+                    "total_score": item.get("total_score", ""),
+                    "dimensions": "|".join(item.get("dimensions", [])),
+                    "close": item.get("close", ""),
+                }
+            )
+    return rows
 
 
