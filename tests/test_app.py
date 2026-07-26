@@ -247,3 +247,33 @@ def test_main_skips_llm_when_local_score_below_threshold(monkeypatch):
     assert len(calls) == 1
     assert "本地得分: 60" in calls[0]
     assert "未调用 LLM 分析" in calls[0]
+
+
+def test_main_llm_threshold_from_rules(monkeypatch, tmp_path):
+    """把门槛改到 101 分时，任何股票都不应触发 LLM。"""
+    from tradeeye.strategies import rules as rules_module
+
+    yaml_file = tmp_path / "rules.yaml"
+    yaml_file.write_text("analysis: {llm_score_threshold: 101}\n", encoding="utf-8")
+    monkeypatch.setenv("TRADEEYE_RULES_FILE", str(yaml_file))
+    rules_module.get_rules.cache_clear()
+
+    analyzer_calls = []
+
+    def fake_fetcher(code, settings):
+        return make_strong_payload()
+
+    def fake_analyzer(data, tech_result, code, settings):
+        analyzer_calls.append(code)
+        return "AI report"
+
+    result = main(
+        settings=make_settings(),
+        data_fetcher=fake_fetcher,
+        analyzer=fake_analyzer,
+        notifier=lambda content, settings: True,
+    )
+
+    rules_module.get_rules.cache_clear()
+    assert result == 0
+    assert analyzer_calls == []

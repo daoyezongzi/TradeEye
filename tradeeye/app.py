@@ -9,6 +9,7 @@ from tradeeye.logging_utils import configure_logging
 from tradeeye.services.analysis import get_llm_analysis
 from tradeeye.services.data import get_clean_data
 from tradeeye.services.notifier import send_report
+from tradeeye.strategies.rules import get_rules
 from tradeeye.strategies.strategy import check_signals
 
 logger = logging.getLogger(__name__)
@@ -16,7 +17,6 @@ logger = logging.getLogger(__name__)
 DataFetcher = Callable[[str, Settings], Optional[dict[str, Any]]]
 Analyzer = Callable[[dict[str, Any], dict[str, Any], str, Settings], str]
 Notifier = Callable[[str, Settings], bool]
-LLM_SCORE_THRESHOLD = 70
 
 
 def build_final_content(
@@ -55,6 +55,7 @@ def main(
         logger.error("TradeEye cannot fetch market data: missing TUSHARE_TOKEN")
         return 1
 
+    llm_score_threshold = get_rules().analysis.llm_score_threshold
     all_reports: list[str] = []
     failed_codes: list[str] = []
     selected_codes, excluded_codes = split_stocks_by_exchange(settings.my_stocks, settings.allowed_exchanges)
@@ -77,7 +78,7 @@ def main(
 
         tech_result = check_signals(data)
         score = _safe_score(tech_result.get("score"))
-        if score >= LLM_SCORE_THRESHOLD:
+        if score >= llm_score_threshold:
             logger.info("Requesting AI analysis for %s (%s), score=%s", data.get("name"), code, score)
             ai_analysis = analyzer(data, tech_result, code, settings)
             all_reports.append(ai_analysis)
@@ -89,7 +90,7 @@ def main(
             data.get("name"),
             code,
             score,
-            LLM_SCORE_THRESHOLD,
+            llm_score_threshold,
         )
         all_reports.append(_build_local_report(data, tech_result, code))
 
