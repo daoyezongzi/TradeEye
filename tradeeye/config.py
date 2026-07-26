@@ -28,7 +28,6 @@ DEFAULT_NEWS_TEMPLATE_FILE = "tradeeye/resources/news_template.txt"
 DEFAULT_LLM_BASE_URL = "https://api.deepseek.com"
 DEFAULT_LLM_MODEL = "deepseek-v4-flash"
 DEFAULT_LLM_TIMEOUT_SEC = 60
-PRICE_RANGES = {"low": [0, 10], "mid": [10, 20]}
 
 EXCHANGE_ALIASES = {
     "SH": {"SH", "SSE", "沪", "沪市", "上海", "上交所", "上海证券交易所"},

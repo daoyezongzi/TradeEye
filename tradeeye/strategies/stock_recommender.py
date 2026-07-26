@@ -6,21 +6,11 @@ from typing import Any
 
 import pandas as pd
 
-from tradeeye.config import PRICE_RANGES, Settings, extract_exchange
+from tradeeye.config import Settings, extract_exchange
 from tradeeye.services.data import build_pro_client, get_market_snapshot
+from tradeeye.strategies.rules import RecommenderRules, get_rules
 
 logger = logging.getLogger(__name__)
-
-SHORT_BURST_VOLUME_RATIO_MIN = 2.0
-SHORT_BURST_TURNOVER_MIN = 5.0
-SHORT_BURST_TURNOVER_MAX = 15.0
-SHORT_BURST_PCT_CHG_MIN = 2.0
-
-T_ACTIVE_AMPLITUDE_MIN = 4.5
-T_ACTIVE_AMOUNT_MIN = 500_000.0  # Tushare daily.amount unit: thousand CNY.
-
-LONG_VALUE_PE_RANK_MAX = 0.4
-LONG_VALUE_MV_RANK_MIN = 0.8
 
 LOW_PRICE_GROUP_KEY = "low_price_group"
 MID_PRICE_GROUP_KEY = "mid_price_group"
@@ -31,6 +21,7 @@ def recommend_top_stocks(
     settings: Settings,
     top_n: int = DEFAULT_TOP_N_PER_GROUP,
     pro_client=None,
+    rules: RecommenderRules | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
     """Fetch market snapshot via existing data service and return grouped recommendations."""
     if not settings.tushare_token:
@@ -48,6 +39,7 @@ def recommend_top_stocks(
         recommender_industries=settings.recommender_industries,
         trade_date=snapshot.trade_date,
         top_n_each_group=top_n,
+        rules=rules,
     )
 
 
@@ -57,17 +49,19 @@ def rank_market_candidates(
     recommender_industries: tuple[str, ...] = (),
     trade_date: str | None = None,
     top_n_each_group: int = DEFAULT_TOP_N_PER_GROUP,
+    rules: RecommenderRules | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
     if market_df.empty:
         return _empty_grouped_result()
 
-    ranked_df = _build_scored_market_frame(market_df, allowed_exchanges, recommender_industries)
+    rules = rules or get_rules().recommender
+    ranked_df = _build_scored_market_frame(market_df, allowed_exchanges, recommender_industries, rules)
     if ranked_df.empty:
         return _empty_grouped_result()
 
     date_value = trade_date or _resolve_trade_date_from_frame(ranked_df)
-    low_min, low_max = _get_price_range("low", (0.0, 10.0))
-    mid_min, mid_max = _get_price_range("mid", (10.0, 20.0))
+    low_min, low_max = rules.price_ranges.low
+    mid_min, mid_max = rules.price_ranges.mid
 
     low_df = ranked_df.loc[(ranked_df["close"] >= low_min) & (ranked_df["close"] <= low_max)].copy()
     mid_df = ranked_df.loc[(ranked_df["close"] > mid_min) & (ranked_df["close"] <= mid_max)].copy()
@@ -122,6 +116,7 @@ def _build_scored_market_frame(
     market_df: pd.DataFrame,
     allowed_exchanges: tuple[str, ...],
     recommender_industries: tuple[str, ...],
+    rules: RecommenderRules,
 ) -> pd.DataFrame:
     frame = market_df.copy()
     frame = _ensure_columns(
@@ -166,7 +161,7 @@ def _build_scored_market_frame(
     if frame.empty:
         return frame
 
-    max_price = max(float(bounds[1]) for bounds in PRICE_RANGES.values())
+    max_price = rules.price_ranges.max_price
     frame = frame.loc[(frame["close"] > 0) & (frame["close"] <= max_price)].copy()
     if frame.empty:
         return frame
@@ -189,26 +184,28 @@ def _build_scored_market_frame(
     frame.loc[(frame["pe_value"] <= 0) | frame["pe_value"].isna(), "pe_value"] = frame["pe"]
     frame.loc[frame["industry"].isna(), "industry"] = ""
 
+    sb = rules.short_burst
     short_mask = (
-        (frame["volume_ratio"] > SHORT_BURST_VOLUME_RATIO_MIN)
-        & (frame["turnover_rate"] >= SHORT_BURST_TURNOVER_MIN)
-        & (frame["turnover_rate"] <= SHORT_BURST_TURNOVER_MAX)
-        & (frame["pct_chg"] > SHORT_BURST_PCT_CHG_MIN)
+        (frame["volume_ratio"] > sb.volume_ratio_min)
+        & (frame["turnover_rate"] >= sb.turnover_min)
+        & (frame["turnover_rate"] <= sb.turnover_max)
+        & (frame["pct_chg"] > sb.pct_chg_min)
     )
     frame["short_burst_score"] = 0.0
     frame.loc[short_mask, "short_burst_score"] = (
         55
-        + ((frame.loc[short_mask, "volume_ratio"] - SHORT_BURST_VOLUME_RATIO_MIN).clip(lower=0, upper=5) / 5) * 20
+        + ((frame.loc[short_mask, "volume_ratio"] - sb.volume_ratio_min).clip(lower=0, upper=5) / 5) * 20
         + (1 - ((frame.loc[short_mask, "turnover_rate"] - 10).abs().clip(upper=5) / 5)) * 15
-        + ((frame.loc[short_mask, "pct_chg"] - SHORT_BURST_PCT_CHG_MIN).clip(lower=0, upper=8) / 8) * 10
+        + ((frame.loc[short_mask, "pct_chg"] - sb.pct_chg_min).clip(lower=0, upper=8) / 8) * 10
     ).clip(lower=0, upper=100)
 
-    t_mask = (frame["intraday_amplitude_pct"] > T_ACTIVE_AMPLITUDE_MIN) & (frame["amount"] > T_ACTIVE_AMOUNT_MIN)
+    ta = rules.t_active
+    t_mask = (frame["intraday_amplitude_pct"] > ta.amplitude_min) & (frame["amount"] > ta.amount_min)
     frame["t_active_score"] = 0.0
     frame.loc[t_mask, "t_active_score"] = (
         50
-        + ((frame.loc[t_mask, "intraday_amplitude_pct"] - T_ACTIVE_AMPLITUDE_MIN).clip(lower=0, upper=8) / 8) * 25
-        + ((frame.loc[t_mask, "amount"] - T_ACTIVE_AMOUNT_MIN).clip(lower=0, upper=1_000_000) / 1_000_000) * 25
+        + ((frame.loc[t_mask, "intraday_amplitude_pct"] - ta.amplitude_min).clip(lower=0, upper=8) / 8) * 25
+        + ((frame.loc[t_mask, "amount"] - ta.amount_min).clip(lower=0, upper=1_000_000) / 1_000_000) * 25
     ).clip(lower=0, upper=100)
 
     frame["long_value_score"] = 0.0
@@ -217,14 +214,15 @@ def _build_scored_market_frame(
     if industry_filter:
         long_df = long_df.loc[long_df["industry"].isin(industry_filter)].copy()
 
+    lv = rules.long_value
     if not long_df.empty:
         long_df["pe_rank"] = long_df.groupby("industry")["pe_value"].rank(pct=True, ascending=True)
         long_df["mv_rank"] = long_df.groupby("industry")["total_mv"].rank(pct=True, ascending=True)
-        long_mask = (long_df["pe_rank"] <= LONG_VALUE_PE_RANK_MAX) & (long_df["mv_rank"] >= LONG_VALUE_MV_RANK_MIN)
+        long_mask = (long_df["pe_rank"] <= lv.pe_rank_max) & (long_df["mv_rank"] >= lv.mv_rank_min)
         long_df.loc[long_mask, "long_value_score"] = (
             50
-            + ((LONG_VALUE_PE_RANK_MAX - long_df.loc[long_mask, "pe_rank"]) / LONG_VALUE_PE_RANK_MAX) * 25
-            + ((long_df.loc[long_mask, "mv_rank"] - LONG_VALUE_MV_RANK_MIN) / (1 - LONG_VALUE_MV_RANK_MIN)) * 25
+            + ((lv.pe_rank_max - long_df.loc[long_mask, "pe_rank"]) / lv.pe_rank_max) * 25
+            + ((long_df.loc[long_mask, "mv_rank"] - lv.mv_rank_min) / (1 - lv.mv_rank_min)) * 25
         ).clip(lower=0, upper=100)
         frame.loc[long_df.index, "long_value_score"] = long_df["long_value_score"]
 
@@ -237,11 +235,12 @@ def _build_scored_market_frame(
     if frame.empty:
         return frame
 
+    w = rules.weights
     frame["total_score"] = (
-        frame["short_burst_score"] * 0.4
-        + frame["t_active_score"] * 0.3
-        + frame["long_value_score"] * 0.3
-        + (frame["dimension_hits"] - 1).clip(lower=0) * 4
+        frame["short_burst_score"] * w.short_burst
+        + frame["t_active_score"] * w.t_active
+        + frame["long_value_score"] * w.long_value
+        + (frame["dimension_hits"] - 1).clip(lower=0) * w.multi_dim_bonus
     ).clip(lower=0, upper=100)
     return frame
 
@@ -304,13 +303,6 @@ def _empty_grouped_result() -> dict[str, list[dict[str, Any]]]:
         LOW_PRICE_GROUP_KEY: [],
         MID_PRICE_GROUP_KEY: [],
     }
-
-
-def _get_price_range(group_key: str, default: tuple[float, float]) -> tuple[float, float]:
-    raw_range = PRICE_RANGES.get(group_key)
-    if not raw_range or len(raw_range) < 2:
-        return default
-    return float(raw_range[0]), float(raw_range[1])
 
 
 def _ensure_columns(frame: pd.DataFrame, columns: list[str]) -> pd.DataFrame:

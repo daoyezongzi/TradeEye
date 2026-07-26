@@ -5,7 +5,6 @@
     DEFAULT_NEWS_LOOKBACK_HOURS,
     DEFAULT_NEWS_MAX_ITEMS,
     DEFAULT_STOCKS,
-    PRICE_RANGES,
     Settings,
     extract_exchange,
     load_settings,
@@ -66,11 +65,6 @@ def test_split_stocks_by_exchange_uses_suffix():
     assert included == ["600000.SH", "000001.SZ"]
     assert excluded == ["430001.BJ"]
     assert extract_exchange("430001.BJ") == "BJ"
-
-
-def test_price_ranges_constant_exists():
-    assert PRICE_RANGES["low"] == [0, 10]
-    assert PRICE_RANGES["mid"] == [10, 20]
 
 
 def test_load_settings_reads_environment(monkeypatch):
