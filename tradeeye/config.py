@@ -28,6 +28,7 @@ DEFAULT_NEWS_TEMPLATE_FILE = "tradeeye/resources/news_template.txt"
 DEFAULT_LLM_BASE_URL = "https://api.deepseek.com"
 DEFAULT_LLM_MODEL = "deepseek-v4-flash"
 DEFAULT_LLM_TIMEOUT_SEC = 60
+DEFAULT_BACKTEST_LOOKBACK_DAYS = 45
 
 EXCHANGE_ALIASES = {
     "SH": {"SH", "SSE", "沪", "沪市", "上海", "上交所", "上海证券交易所"},
@@ -159,6 +160,7 @@ class Settings:
     llm_base_url: str = DEFAULT_LLM_BASE_URL
     llm_model: str = DEFAULT_LLM_MODEL
     llm_timeout_sec: int = DEFAULT_LLM_TIMEOUT_SEC
+    backtest_lookback_days: int = DEFAULT_BACKTEST_LOOKBACK_DAYS
 
     @property
     def llm_chat_completions_url(self) -> str:
@@ -202,6 +204,11 @@ class Settings:
             llm_timeout_sec=parse_int(
                 os.getenv("LLM_TIMEOUT_SEC"),
                 default=DEFAULT_LLM_TIMEOUT_SEC,
+                minimum=1,
+            ),
+            backtest_lookback_days=parse_int(
+                os.getenv("BACKTEST_LOOKBACK_DAYS"),
+                default=DEFAULT_BACKTEST_LOOKBACK_DAYS,
                 minimum=1,
             ),
         )

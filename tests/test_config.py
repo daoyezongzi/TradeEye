@@ -131,3 +131,18 @@ def test_load_settings_uses_defaults_when_invalid(monkeypatch):
     assert settings.news_lookback_hours == DEFAULT_NEWS_LOOKBACK_HOURS
     assert settings.news_max_items == DEFAULT_NEWS_MAX_ITEMS
     assert settings.news_push_when_empty is False
+
+
+def test_backtest_lookback_days_default(monkeypatch):
+    monkeypatch.delenv("BACKTEST_LOOKBACK_DAYS", raising=False)
+    assert Settings.from_env().backtest_lookback_days == 45
+
+
+def test_backtest_lookback_days_env(monkeypatch):
+    monkeypatch.setenv("BACKTEST_LOOKBACK_DAYS", "30")
+    assert Settings.from_env().backtest_lookback_days == 30
+
+
+def test_backtest_lookback_days_invalid_falls_back(monkeypatch):
+    monkeypatch.setenv("BACKTEST_LOOKBACK_DAYS", "0")
+    assert Settings.from_env().backtest_lookback_days == 45
