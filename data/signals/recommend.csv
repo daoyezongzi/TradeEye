@@ -1,0 +1,11 @@
+date,ts_code,name,price_group,total_score,dimensions,close
+20260724,000595.SZ,新能股份,low_price_group,59.03,short_burst|t_active,6.07
+20260724,000703.SZ,恒逸石化,mid_price_group,53.42,t_active|long_value,15.05
+20260724,002300.SZ,太阳电缆,low_price_group,56.46,short_burst|t_active,7.1
+20260724,300017.SZ,网宿科技,mid_price_group,52.74,t_active|long_value,13.0
+20260724,600011.SH,华能国际,low_price_group,51.67,t_active|long_value,7.09
+20260724,600188.SH,兖矿能源,mid_price_group,54.74,t_active|long_value,19.73
+20260724,600352.SH,浙江龙盛,mid_price_group,52.24,t_active|long_value,12.28
+20260724,601600.SH,中国铝业,low_price_group,50.96,t_active|long_value,9.44
+20260724,603993.SH,洛阳钼业,mid_price_group,55.46,t_active|long_value,19.04
+20260724,605162.SH,新中港,low_price_group,51.87,short_burst|t_active,8.64
