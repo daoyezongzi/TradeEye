@@ -9,3 +9,13 @@ date,ts_code,name,price_group,total_score,dimensions,close
 20260724,601600.SH,中国铝业,low_price_group,50.96,t_active|long_value,9.44
 20260724,603993.SH,洛阳钼业,mid_price_group,55.46,t_active|long_value,19.04
 20260724,605162.SH,新中港,low_price_group,51.87,short_burst|t_active,8.64
+20260727,000533.SZ,顺钠股份,mid_price_group,53.04,short_burst|t_active,10.51
+20260727,000670.SZ,盈方微,low_price_group,54.63,short_burst|t_active,6.93
+20260727,000703.SZ,恒逸石化,mid_price_group,52.5,t_active|long_value,15.81
+20260727,000725.SZ,京东方A,low_price_group,53.58,t_active|long_value,5.97
+20260727,002498.SZ,汉缆股份,low_price_group,69.35,short_burst|t_active,7.1
+20260727,300017.SZ,网宿科技,mid_price_group,52.25,t_active|long_value,13.33
+20260727,600698.SH,湖南天雁,low_price_group,56.22,short_burst|t_active,7.08
+20260727,600726.SH,华电能源,low_price_group,30.0,t_active,6.25
+20260727,600999.SH,招商证券,mid_price_group,54.18,t_active|long_value,18.23
+20260727,601857.SH,中国石油,mid_price_group,52.44,t_active|long_value,10.9
