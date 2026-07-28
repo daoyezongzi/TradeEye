@@ -19,3 +19,13 @@ date,ts_code,name,price_group,total_score,dimensions,close
 20260727,600726.SH,华电能源,low_price_group,30.0,t_active,6.25
 20260727,600999.SH,招商证券,mid_price_group,54.18,t_active|long_value,18.23
 20260727,601857.SH,中国石油,mid_price_group,52.44,t_active|long_value,10.9
+20260728,000725.SZ,京东方A,low_price_group,53.4,t_active|long_value,5.58
+20260728,002310.SZ,东方新能,low_price_group,59.55,short_burst|t_active,2.65
+20260728,002366.SZ,融发核电,low_price_group,58.05,short_burst|t_active,5.75
+20260728,002440.SZ,闰土股份,mid_price_group,52.88,t_active|long_value,12.4
+20260728,002549.SZ,凯美特气,mid_price_group,55.01,short_burst|t_active,14.01
+20260728,002647.SZ,仁东控股,low_price_group,52.03,short_burst|t_active,9.57
+20260728,300293.SZ,蓝英装备,mid_price_group,63.41,short_burst|t_active,16.95
+20260728,600415.SH,小商品城,mid_price_group,55.45,t_active|long_value,11.83
+20260728,600775.SH,南京熊猫,mid_price_group,52.94,short_burst|t_active,10.35
+20260728,600881.SH,亚泰集团,low_price_group,54.38,short_burst|t_active,1.81
