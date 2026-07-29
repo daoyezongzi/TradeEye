@@ -29,3 +29,13 @@ date,ts_code,name,price_group,total_score,dimensions,close
 20260728,600415.SH,小商品城,mid_price_group,55.45,t_active|long_value,11.83
 20260728,600775.SH,南京熊猫,mid_price_group,52.94,short_burst|t_active,10.35
 20260728,600881.SH,亚泰集团,low_price_group,54.38,short_burst|t_active,1.81
+20260729,000690.SZ,宝新能源,low_price_group,54.01,short_burst|t_active,5.09
+20260729,002130.SZ,沃尔核材,mid_price_group,81.2,short_burst|t_active|long_value,16.48
+20260729,002244.SZ,滨江集团,low_price_group,51.77,t_active|long_value,9.45
+20260729,002602.SZ,世纪华通,mid_price_group,59.95,t_active|long_value,13.55
+20260729,002969.SZ,嘉美包装,mid_price_group,64.41,short_burst|t_active,13.14
+20260729,300328.SZ,宜安科技,mid_price_group,61.32,short_burst|t_active,12.33
+20260729,600326.SH,西藏天路,low_price_group,55.78,short_burst|t_active,6.81
+20260729,600352.SH,浙江龙盛,mid_price_group,57.01,t_active|long_value,13.55
+20260729,600577.SH,精达股份,low_price_group,41.5,t_active|long_value,7.54
+20260729,600693.SH,东百集团,low_price_group,60.11,short_burst|t_active,9.47
