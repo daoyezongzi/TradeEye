@@ -39,3 +39,13 @@ date,ts_code,name,price_group,total_score,dimensions,close
 20260729,600352.SH,浙江龙盛,mid_price_group,57.01,t_active|long_value,13.55
 20260729,600577.SH,精达股份,low_price_group,41.5,t_active|long_value,7.54
 20260729,600693.SH,东百集团,low_price_group,60.11,short_burst|t_active,9.47
+20260730,000725.SZ,京东方A,low_price_group,54.82,t_active|long_value,5.36
+20260730,000859.SZ,国风新材,low_price_group,56.07,short_burst|t_active,8.37
+20260730,002585.SZ,双星新材,low_price_group,55.91,short_burst|t_active,8.66
+20260730,002602.SZ,世纪华通,mid_price_group,55.95,t_active|long_value,13.19
+20260730,002703.SZ,浙江世宝,mid_price_group,56.65,short_burst|t_active,14.61
+20260730,300170.SZ,汉得信息,mid_price_group,76.87,short_burst|t_active|long_value,15.07
+20260730,300981.SZ,中红医疗,mid_price_group,65.6,short_burst|t_active,14.18
+20260730,600619.SH,海立股份,mid_price_group,57.47,short_burst|t_active,14.24
+20260730,600733.SH,北汽蓝谷,low_price_group,58.14,short_burst|t_active,5.96
+20260730,603327.SH,福蓉科技,low_price_group,55.04,short_burst|t_active,9.11
