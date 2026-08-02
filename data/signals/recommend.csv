@@ -49,3 +49,13 @@ date,ts_code,name,price_group,total_score,dimensions,close
 20260730,600619.SH,海立股份,mid_price_group,57.47,short_burst|t_active,14.24
 20260730,600733.SH,北汽蓝谷,low_price_group,58.14,short_burst|t_active,5.96
 20260730,603327.SH,福蓉科技,low_price_group,55.04,short_burst|t_active,9.11
+20260731,000009.SZ,中国宝安,low_price_group,61.46,short_burst|t_active,7.87
+20260731,002131.SZ,利欧股份,low_price_group,60.45,short_burst|t_active,4.66
+20260731,002400.SZ,省广集团,low_price_group,60.69,short_burst|t_active,6.8
+20260731,002555.SZ,三七互娱,mid_price_group,82.58,short_burst|t_active|long_value,19.91
+20260731,300017.SZ,网宿科技,mid_price_group,92.98,short_burst|t_active|long_value,14.03
+20260731,300166.SZ,东方国信,mid_price_group,61.89,short_burst|t_active,13.23
+20260731,300170.SZ,汉得信息,mid_price_group,63.8,short_burst|t_active,16.65
+20260731,300182.SZ,捷成股份,low_price_group,63.72,short_burst|t_active,5.1
+20260731,300244.SZ,迪安诊断,mid_price_group,61.14,short_burst|t_active,18.25
+20260731,300525.SZ,博思软件,low_price_group,61.21,short_burst|t_active,9.36
