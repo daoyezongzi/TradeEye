@@ -59,3 +59,13 @@ date,ts_code,name,price_group,total_score,dimensions,close
 20260731,300182.SZ,捷成股份,low_price_group,63.72,short_burst|t_active,5.1
 20260731,300244.SZ,迪安诊断,mid_price_group,61.14,short_burst|t_active,18.25
 20260731,300525.SZ,博思软件,low_price_group,61.21,short_burst|t_active,9.36
+20260803,000683.SZ,博源化工,low_price_group,46.58,t_active|long_value,6.11
+20260803,000818.SZ,航锦科技,mid_price_group,54.1,short_burst|t_active,13.4
+20260803,001696.SZ,宗申动力,mid_price_group,58.55,short_burst|t_active,15.14
+20260803,002027.SZ,分众传媒,low_price_group,53.94,t_active|long_value,5.34
+20260803,002031.SZ,巨轮智能,low_price_group,54.33,short_burst|t_active,5.21
+20260803,002410.SZ,广联达,low_price_group,42.94,t_active|long_value,9.77
+20260803,002602.SZ,世纪华通,mid_price_group,54.99,t_active|long_value,13.82
+20260803,002639.SZ,雪人集团,mid_price_group,54.08,short_burst|t_active,12.61
+20260803,300963.SZ,中洲特材,mid_price_group,55.06,short_burst|t_active,12.71
+20260803,600577.SH,精达股份,low_price_group,41.87,t_active|long_value,8.09
