@@ -69,3 +69,13 @@ date,ts_code,name,price_group,total_score,dimensions,close
 20260803,002639.SZ,雪人集团,mid_price_group,54.08,short_burst|t_active,12.61
 20260803,300963.SZ,中洲特材,mid_price_group,55.06,short_burst|t_active,12.71
 20260803,600577.SH,精达股份,low_price_group,41.87,t_active|long_value,8.09
+20260804,000967.SZ,盈峰环境,low_price_group,63.03,short_burst|t_active,9.09
+20260804,000981.SZ,山子高科,low_price_group,61.51,short_burst|t_active,2.88
+20260804,002366.SZ,融发核电,low_price_group,54.92,short_burst|t_active,6.44
+20260804,002438.SZ,江苏神通,mid_price_group,80.31,short_burst|t_active|long_value,14.5
+20260804,300229.SZ,拓尔思,mid_price_group,62.7,short_burst|t_active,15.81
+20260804,300358.SZ,楚天科技,low_price_group,56.57,short_burst|t_active,9.15
+20260804,300363.SZ,博腾股份,mid_price_group,63.1,short_burst|t_active,17.73
+20260804,600267.SH,海正药业,mid_price_group,71.97,short_burst|t_active|long_value,12.15
+20260804,600468.SH,百利电气,low_price_group,55.81,short_burst|t_active,6.72
+20260804,601611.SH,中国核建,mid_price_group,57.25,short_burst|t_active,12.12
