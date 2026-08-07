@@ -89,3 +89,13 @@ date,ts_code,name,price_group,total_score,dimensions,close
 20260805,600556.SH,天下秀,low_price_group,56.52,short_burst|t_active,5.54
 20260805,600711.SH,盛屯矿业,mid_price_group,57.16,t_active|long_value,11.52
 20260805,601611.SH,中国核建,mid_price_group,56.37,short_burst|t_active,12.7
+20260806,000725.SZ,京东方A,low_price_group,52.8,t_active|long_value,5.96
+20260806,002413.SZ,雷科防务,low_price_group,57.04,short_burst|t_active,8.69
+20260806,002565.SZ,顺灏股份,low_price_group,58.25,short_burst|t_active,9.88
+20260806,002649.SZ,博彦科技,mid_price_group,53.94,short_burst|t_active,11.29
+20260806,002734.SZ,利民股份,mid_price_group,55.56,short_burst|t_active,16.15
+20260806,300134.SZ,大富科技,low_price_group,61.35,short_burst|t_active,9.59
+20260806,300322.SZ,硕贝德,mid_price_group,57.32,short_burst|t_active,19.2
+20260806,600121.SH,郑州煤电,low_price_group,55.02,short_burst|t_active,4.26
+20260806,600711.SH,盛屯矿业,mid_price_group,56.89,t_active|long_value,11.4
+20260806,601898.SH,中煤能源,mid_price_group,57.39,t_active|long_value,14.2
