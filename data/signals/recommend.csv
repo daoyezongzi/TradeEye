@@ -99,3 +99,13 @@ date,ts_code,name,price_group,total_score,dimensions,close
 20260806,600121.SH,郑州煤电,low_price_group,55.02,short_burst|t_active,4.26
 20260806,600711.SH,盛屯矿业,mid_price_group,56.89,t_active|long_value,11.4
 20260806,601898.SH,中煤能源,mid_price_group,57.39,t_active|long_value,14.2
+20260807,000725.SZ,京东方A,low_price_group,52.69,t_active|long_value,6.07
+20260807,002413.SZ,雷科防务,low_price_group,60.49,short_burst|t_active,9.17
+20260807,002437.SZ,誉衡药业,low_price_group,59.74,short_burst|t_active,3.12
+20260807,002698.SZ,博实股份,mid_price_group,85.64,short_burst|t_active|long_value,13.68
+20260807,003040.SZ,楚天龙,mid_price_group,57.79,short_burst|t_active,13.1
+20260807,300039.SZ,上海凯宝,low_price_group,52.5,short_burst|t_active,5.96
+20260807,300142.SZ,沃森生物,mid_price_group,59.59,short_burst|t_active,13.14
+20260807,300409.SZ,道氏技术,mid_price_group,77.62,short_burst|t_active|long_value,19.27
+20260807,600127.SH,金健米业,low_price_group,53.32,short_burst|t_active,6.32
+20260807,603456.SH,九洲药业,mid_price_group,81.72,short_burst|t_active|long_value,16.45
