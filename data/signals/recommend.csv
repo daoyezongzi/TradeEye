@@ -109,3 +109,13 @@ date,ts_code,name,price_group,total_score,dimensions,close
 20260807,300409.SZ,道氏技术,mid_price_group,77.62,short_burst|t_active|long_value,19.27
 20260807,600127.SH,金健米业,low_price_group,53.32,short_burst|t_active,6.32
 20260807,603456.SH,九洲药业,mid_price_group,81.72,short_burst|t_active|long_value,16.45
+20260810,000725.SZ,京东方A,low_price_group,52.47,t_active|long_value,5.89
+20260810,000973.SZ,佛塑科技,mid_price_group,61.0,short_burst|t_active,13.68
+20260810,002589.SZ,瑞康医药,low_price_group,52.6,short_burst|t_active,3.34
+20260810,002739.SZ,儒意电影,low_price_group,62.57,short_burst|t_active,9.93
+20260810,002783.SZ,凯龙股份,low_price_group,34.48,short_burst,8.21
+20260810,300015.SZ,爱尔眼科,low_price_group,51.86,t_active|long_value,9.07
+20260810,600267.SH,海正药业,mid_price_group,80.84,short_burst|t_active|long_value,14.24
+20260810,600352.SH,浙江龙盛,mid_price_group,54.46,t_active|long_value,13.99
+20260810,600711.SH,盛屯矿业,mid_price_group,60.53,t_active|long_value,12.74
+20260810,603328.SH,依顿电子,mid_price_group,81.54,short_burst|t_active|long_value,11.42
