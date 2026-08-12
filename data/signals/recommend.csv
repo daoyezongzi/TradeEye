@@ -129,3 +129,13 @@ date,ts_code,name,price_group,total_score,dimensions,close
 20260811,600711.SH,盛屯矿业,mid_price_group,56.0,t_active|long_value,12.4
 20260811,603993.SH,洛阳钼业,mid_price_group,58.87,t_active|long_value,19.13
 20260811,688469.SH,芯联集成,low_price_group,56.94,short_burst|t_active,9.17
+20260812,000837.SZ,秦川机床,mid_price_group,52.1,short_burst|t_active,11.2
+20260812,002244.SZ,滨江集团,low_price_group,52.84,t_active|long_value,9.53
+20260812,002685.SZ,华东重机,low_price_group,51.72,short_burst|t_active,6.21
+20260812,300017.SZ,网宿科技,mid_price_group,51.75,t_active|long_value,14.64
+20260812,300119.SZ,瑞普生物,mid_price_group,59.71,short_burst|t_active,19.84
+20260812,300197.SZ,节能铁汉,low_price_group,61.63,short_burst|t_active,2.3
+20260812,600216.SH,浙江医药,mid_price_group,84.4,short_burst|t_active|long_value,13.77
+20260812,600352.SH,浙江龙盛,mid_price_group,51.48,t_active|long_value,13.7
+20260812,600572.SH,康恩贝,low_price_group,81.72,short_burst|t_active|long_value,4.75
+20260812,600881.SH,亚泰集团,low_price_group,59.93,short_burst|t_active,2.06
