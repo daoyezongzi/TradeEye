@@ -139,3 +139,13 @@ date,ts_code,name,price_group,total_score,dimensions,close
 20260812,600352.SH,浙江龙盛,mid_price_group,51.48,t_active|long_value,13.7
 20260812,600572.SH,康恩贝,low_price_group,81.72,short_burst|t_active|long_value,4.75
 20260812,600881.SH,亚泰集团,low_price_group,59.93,short_burst|t_active,2.06
+20260813,002015.SZ,协鑫能科,mid_price_group,60.24,short_burst|t_active,16.44
+20260813,002023.SZ,海特高新,mid_price_group,55.37,short_burst|t_active,10.77
+20260813,300026.SZ,红日药业,low_price_group,61.43,short_burst|t_active,3.76
+20260813,600578.SH,京能电力,low_price_group,61.03,short_burst|t_active,6.59
+20260813,600711.SH,盛屯矿业,mid_price_group,54.05,t_active|long_value,11.85
+20260813,600868.SH,梅雁吉祥,low_price_group,59.44,short_burst|t_active,3.12
+20260813,601108.SH,财通证券,low_price_group,64.84,short_burst|t_active,8.98
+20260813,601991.SH,大唐发电,low_price_group,62.03,short_burst|t_active,6.92
+20260813,603191.SH,望变电气,mid_price_group,61.98,short_burst|t_active,16.94
+20260813,603456.SH,九洲药业,mid_price_group,55.67,t_active|long_value,18.26
