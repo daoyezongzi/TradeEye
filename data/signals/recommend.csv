@@ -149,3 +149,13 @@ date,ts_code,name,price_group,total_score,dimensions,close
 20260813,601991.SH,大唐发电,low_price_group,62.03,short_burst|t_active,6.92
 20260813,603191.SH,望变电气,mid_price_group,61.98,short_burst|t_active,16.94
 20260813,603456.SH,九洲药业,mid_price_group,55.67,t_active|long_value,18.26
+20260814,000620.SZ,盈新发展,low_price_group,63.14,short_burst|t_active,3.03
+20260814,000917.SZ,电广传媒,low_price_group,50.11,short_burst|t_active,7.73
+20260814,002467.SZ,二六三,low_price_group,59.06,short_burst|t_active,5.13
+20260814,002517.SZ,恺英网络,mid_price_group,53.0,t_active|long_value,18.3
+20260814,002602.SZ,世纪华通,mid_price_group,55.6,t_active|long_value,14.6
+20260814,300004.SZ,南风股份,low_price_group,55.57,short_burst|t_active,8.91
+20260814,300017.SZ,网宿科技,mid_price_group,58.45,t_active|long_value,17.33
+20260814,601579.SH,会稽山,mid_price_group,58.47,short_burst|t_active,18.68
+20260814,601890.SH,亚星锚链,low_price_group,63.34,short_burst|t_active,9.18
+20260814,603803.SH,瑞斯康达,mid_price_group,53.17,short_burst|t_active,11.14
