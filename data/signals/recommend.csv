@@ -179,3 +179,13 @@ date,ts_code,name,price_group,total_score,dimensions,close
 20260818,600577.SH,精达股份,low_price_group,81.49,short_burst|t_active|long_value,8.63
 20260818,600598.SH,北大荒,mid_price_group,92.7,short_burst|t_active|long_value,13.46
 20260818,600707.SH,彩虹股份,mid_price_group,64.66,short_burst|t_active,10.8
+20260819,000523.SZ,红棉股份,low_price_group,55.63,short_burst|t_active,3.21
+20260819,000703.SZ,恒逸石化,mid_price_group,56.56,t_active|long_value,19.08
+20260819,000725.SZ,京东方A,low_price_group,54.5,t_active|long_value,6.01
+20260819,002668.SZ,TCL智家,low_price_group,46.7,t_active|long_value,8.88
+20260819,300035.SZ,中科电气,mid_price_group,64.64,short_burst|t_active,14.69
+20260819,301211.SZ,亨迪药业,mid_price_group,59.08,short_burst|t_active,14.54
+20260819,600121.SH,郑州煤电,low_price_group,52.09,short_burst|t_active,4.17
+20260819,600598.SH,北大荒,mid_price_group,90.78,short_burst|t_active|long_value,13.86
+20260819,601015.SH,陕西黑猫,low_price_group,56.22,short_burst|t_active,3.71
+20260819,601609.SH,金田股份,mid_price_group,63.47,short_burst|t_active,12.95
