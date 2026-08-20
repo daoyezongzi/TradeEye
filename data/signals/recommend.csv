@@ -189,3 +189,13 @@ date,ts_code,name,price_group,total_score,dimensions,close
 20260819,600598.SH,北大荒,mid_price_group,90.78,short_burst|t_active|long_value,13.86
 20260819,601015.SH,陕西黑猫,low_price_group,56.22,short_burst|t_active,3.71
 20260819,601609.SH,金田股份,mid_price_group,63.47,short_burst|t_active,12.95
+20260820,002202.SZ,金风科技,mid_price_group,54.54,t_active|long_value,19.84
+20260820,300171.SZ,东富龙,mid_price_group,60.99,short_burst|t_active,14.9
+20260820,300358.SZ,楚天科技,low_price_group,54.76,short_burst|t_active,9.25
+20260820,300601.SZ,康泰生物,mid_price_group,65.88,short_burst|t_active,14.47
+20260820,600598.SH,北大荒,mid_price_group,55.48,t_active|long_value,13.31
+20260820,600610.SH,中毅达,low_price_group,55.02,short_burst|t_active,8.02
+20260820,600649.SH,城投控股,low_price_group,57.65,short_burst|t_active,4.16
+20260820,600711.SH,盛屯矿业,mid_price_group,54.61,t_active|long_value,11.64
+20260820,601600.SH,中国铝业,low_price_group,50.5,t_active|long_value,9.17
+20260820,603123.SH,翠微股份,low_price_group,56.91,short_burst|t_active,9.23
