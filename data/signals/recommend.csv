@@ -199,3 +199,13 @@ date,ts_code,name,price_group,total_score,dimensions,close
 20260820,600711.SH,盛屯矿业,mid_price_group,54.61,t_active|long_value,11.64
 20260820,601600.SH,中国铝业,low_price_group,50.5,t_active|long_value,9.17
 20260820,603123.SH,翠微股份,low_price_group,56.91,short_burst|t_active,9.23
+20260821,000786.SZ,北新建材,mid_price_group,52.75,t_active|long_value,16.98
+20260821,300017.SZ,网宿科技,mid_price_group,51.12,t_active|long_value,15.54
+20260821,300180.SZ,华峰超纤,low_price_group,63.74,short_burst|t_active,4.53
+20260821,300221.SZ,银禧科技,mid_price_group,54.45,short_burst|t_active,14.4
+20260821,300773.SZ,拉卡拉,mid_price_group,83.95,short_burst|t_active|long_value,15.41
+20260821,600577.SH,精达股份,low_price_group,50.0,t_active|long_value,8.66
+20260821,600711.SH,盛屯矿业,mid_price_group,53.42,t_active|long_value,12.1
+20260821,600916.SH,中国黄金,low_price_group,51.87,short_burst|t_active,8.14
+20260821,603123.SH,翠微股份,low_price_group,50.18,short_burst|t_active,9.46
+20260821,603327.SH,福蓉科技,low_price_group,49.7,short_burst|t_active,9.33
