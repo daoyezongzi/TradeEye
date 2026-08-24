@@ -70,7 +70,7 @@ def test_round_trip_cost_is_deducted_at_exit():
 
 
 @pytest.mark.parametrize("down_limit", [None, 0, float("nan"), float("inf")])
-def test_tushare_batch_requires_valid_down_limit_for_every_daily_row(down_limit):
+def test_tushare_batch_degrades_only_quote_with_invalid_down_limit(down_limit, caplog):
     daily = pd.DataFrame(
         [
             {
@@ -99,7 +99,32 @@ def test_tushare_batch_requires_valid_down_limit_for_every_daily_row(down_limit)
     )
     provider = TushareMarketDataProvider(FakeTushareClient(daily, limits))
 
-    with pytest.raises(MarketDataUnavailable, match="600002.SH"):
+    batch = provider.get_daily_market("20260804")
+
+    assert batch.quotes["600001.SH"].down_limit == pytest.approx(9.0)
+    assert batch.quote("600002.SH") is None
+    assert "600002.SH" in caplog.text
+
+
+def test_tushare_batch_still_fails_when_no_quote_has_valid_down_limit():
+    daily = pd.DataFrame(
+        [
+            {
+                "ts_code": "600001.SH",
+                "trade_date": "20260804",
+                "open": 10.0,
+                "high": 10.2,
+                "low": 9.9,
+                "close": 10.1,
+            }
+        ]
+    )
+    limits = pd.DataFrame(
+        [{"ts_code": "600001.SH", "trade_date": "20260804", "down_limit": None}]
+    )
+    provider = TushareMarketDataProvider(FakeTushareClient(daily, limits))
+
+    with pytest.raises(MarketDataUnavailable, match="any daily quote"):
         provider.get_daily_market("20260804")
 
 

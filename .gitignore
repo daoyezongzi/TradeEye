@@ -13,6 +13,7 @@ workspace
 
 # Pytest caches
 .pytest_cache/
+.pytest-tmp/
 pytest-cache-files-*/
 
 AGENTS.md

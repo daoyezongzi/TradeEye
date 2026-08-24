@@ -29,14 +29,15 @@
 
 ## 验证基线
 
-- [x] `python -m pytest`：148 项通过。
+- [x] `python -m pytest`：150 项通过；Windows/Python 3.13 与无预建临时目录的 Linux/Python 3.13 均已验证。
 - [x] `python -m compileall -q tradeeye main.py recommend_main.py news_main.py backtest_main.py portfolio_main.py config.py`：通过。
 - [x] `git diff --check`：通过。
 - [x] 固定假数据覆盖推荐、结算、盘后诊断和周报，不连接真实券商，也不执行真实下单。
 
 ## 上线后优先观察
 
-- [ ] 查看首轮 06:00 / 18:00 / 周五 19:30 Actions，确认 Tushare 权限、飞书推送和三类 CSV 提交链路在真实仓库环境正常。
+- [x] 排查首轮 push CI 与 18:00 核心任务：已修复 clean checkout 缺少 pytest 临时目录父级，以及单只股票缺失跌停价阻断全市场结算的问题。
+- [ ] 重新运行并继续观察 06:00 / 18:00 / 周五 19:30 Actions，确认 Tushare、飞书推送和三类 CSV 提交链路在真实仓库环境正常。
 - [ ] 连续观察幂等重跑、GitHub Actions 推送冲突与主/辅行情降级日志，确认失败时没有错误推进账本。
 - [ ] 积累足够 `recommend_v2` 样本后，小范围比较最低质量分和已确认风险门；同时报告样本量、触发率和净收益，不做大规模样本内参数搜索。
 - [ ] 在 GitHub 仓库设置中手动删除不再使用的 LLM Secrets/Variables；保留 `TUSHARE_TOKEN` 与 `FEISHU_WEBHOOK`。

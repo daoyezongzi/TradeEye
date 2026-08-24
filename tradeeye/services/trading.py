@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import logging
 import math
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
 import pandas as pd
+
+
+logger = logging.getLogger(__name__)
 
 
 class MarketDataUnavailable(RuntimeError):
@@ -71,7 +75,7 @@ class ExitDecision:
 
 
 class TushareMarketDataProvider:
-    """Strict Tushare adapter: batch failures raise instead of becoming fake suspensions."""
+    """Tushare adapter with fatal batch errors and conservative per-symbol degradation."""
 
     def __init__(self, pro_client) -> None:
         self._client = pro_client
@@ -118,22 +122,29 @@ class TushareMarketDataProvider:
             down_limit = _optional_float(row["down_limit"])
             if down_limit is not None:
                 down_limits[str(row["ts_code"])] = down_limit
-        missing_limits = sorted(
-            {
-                str(code)
-                for code in daily["ts_code"]
-                if str(code) not in down_limits
-            }
-        )
-        if missing_limits:
+        daily_codes = {str(code) for code in daily["ts_code"]}
+        usable_limit_codes = daily_codes.intersection(down_limits)
+        if not usable_limit_codes:
             raise MarketDataUnavailable(
-                f"limit-price batch has no valid down_limit for "
-                f"{','.join(missing_limits)} on {trade_date}"
+                f"limit-price batch has no valid down_limit for any daily quote on {trade_date}"
+            )
+        missing_limits = sorted(daily_codes.difference(down_limits))
+        if missing_limits:
+            preview = ",".join(missing_limits[:10])
+            suffix = "" if len(missing_limits) <= 10 else f",...(+{len(missing_limits) - 10})"
+            logger.warning(
+                "Skipping %d quote(s) without a valid down_limit on %s: %s%s",
+                len(missing_limits),
+                trade_date,
+                preview,
+                suffix,
             )
 
         quotes: dict[str, MarketQuote] = {}
         for _, row in daily.iterrows():
             code = str(row["ts_code"])
+            if code not in down_limits:
+                continue
             quote = MarketQuote(
                 trade_date=trade_date,
                 ts_code=code,

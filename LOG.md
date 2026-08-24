@@ -1171,3 +1171,23 @@ total_score = short_burst * 0.4
 - 当前最低质量分、风险阈值和 2% 回踩属于可解释的第一版基线，不宣称经过历史参数寻优。
 - 年化、夏普、完整回撤、指数基准、MFE/MAE 和 ETF 独立绩效序列继续留待样本积累后实现。
 - GitHub 仓库中旧 LLM Secrets/Variables 需要由仓库管理员在设置页手动删除；本地代码不读取这些配置。
+
+## 2026-08-24｜GitHub Actions 结算与 CI 故障修复
+
+### 故障证据
+
+- `TradeEye Core Automation #226` 失败在 `Settle recommendation trades and NAV`，尚未执行盘后诊断和飞书推送；真实异常为 `920176.BJ` 在 `20260727` 缺少有效 `down_limit`，不是飞书发送失败。
+- `TradeEye CI #1` 失败在测试步骤：clean checkout 不存在被忽略的 `.tmp/`，而 `--basetemp=.tmp/pytest` 不会代建父目录，造成 43 个 `tmp_path` 用例报 `FileNotFoundError`。
+
+### 修复结果
+
+- Tushare 日线或涨跌停接口整批不可用、以及整日没有任何可安全结算报价时仍保持失败，不推进账本。
+- 只有个别代码缺少有效跌停价时，记录告警并保守跳过该股报价；其他代码继续结算。缺失代码不会被误判为可卖出，D+1 按无报价终止入场，已持仓按现有延期规则处理。
+- pytest 临时目录改为仓库根目录下可直接创建的 `.pytest-tmp`，并加入忽略规则，不再依赖 checkout 中不存在的父目录。
+
+### 验证证据
+
+- 新增部分跌停价缺失降级、整批仍须失败和 clean checkout 临时目录回归用例。
+- Windows/Python 3.13：`150 passed`。
+- 无 `.tmp/` 的 Linux/Python 3.13 clean checkout 模拟：`150 passed`，随后 `compileall` 通过。
+- 修复后仍需由推送触发真实 GitHub Actions，确认生产 Tushare 数据链路与后续飞书步骤完整跑通。

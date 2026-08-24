@@ -48,6 +48,13 @@ def test_tests_are_kept_in_dedicated_ci_workflow():
     assert "python -m compileall -q tradeeye" in ci
 
 
+def test_pytest_basetemp_is_creatable_in_a_clean_checkout():
+    pytest_ini = (ROOT / "pytest.ini").read_text(encoding="utf-8")
+
+    assert "--basetemp=.pytest-tmp" in pytest_ini
+    assert "--basetemp=.tmp/" not in pytest_ini
+
+
 def test_runtime_configuration_has_no_llm_and_persists_new_csv_paths():
     env_example = (ROOT / ".env.example").read_text(encoding="utf-8")
     gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
