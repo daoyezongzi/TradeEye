@@ -1190,4 +1190,5 @@ total_score = short_burst * 0.4
 - 新增部分跌停价缺失降级、整批仍须失败和 clean checkout 临时目录回归用例。
 - Windows/Python 3.13：`150 passed`。
 - 无 `.tmp/` 的 Linux/Python 3.13 clean checkout 模拟：`150 passed`，随后 `compileall` 通过。
-- 修复后仍需由推送触发真实 GitHub Actions，确认生产 Tushare 数据链路与后续飞书步骤完整跑通。
+- 推送后的真实 `TradeEye CI` 已通过；手动 `settle` 生产任务也已成功结算到 `20260824`，写入 210 条交易状态与 22 条 NAV。日志中的 9 个北交所跌停价缺失均按单股告警降级，没有再阻断整批。
+- 本次用 `settle` 模式验证原故障路径，未主动补发盘后飞书消息；飞书步骤留给下一次正常 `evening` 批次验证，避免产生重复通知。
