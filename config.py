@@ -11,14 +11,6 @@ class Config:
         return load_settings().feishu_webhook
 
     @property
-    def LLM_API_KEY(self) -> str:
-        return load_settings().llm_api_key
-
-    @property
-    def LLM_BASE_URL(self) -> str:
-        return load_settings().llm_base_url
-
-    @property
     def DEBUG_MODE(self) -> bool:
         return load_settings().debug_mode
 

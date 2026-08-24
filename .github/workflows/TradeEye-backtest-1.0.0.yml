@@ -1,35 +1,67 @@
-name: TradeEye Weekly Backtest
+name: TradeEye Weekly Report
 
 on:
   schedule:
-    - cron: "30 10 * * 5"   # 北京时间周五 18:30，当日收盘数据已就绪
+    # Friday 19:30 Asia/Shanghai, after the evening state update.
+    - cron: "30 11 * * 5"
   workflow_dispatch:
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
-  backtest_job:
+  weekly_report:
     runs-on: ubuntu-latest
     env:
-      TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
       FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
       BACKTEST_LOOKBACK_DAYS: ${{ vars.BACKTEST_LOOKBACK_DAYS || '45' }}
       DEBUG_MODE: "false"
 
     steps:
+      - name: Verify the Friday evening batch completed
+        if: github.event_name == 'schedule'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cutoff="$(date -u +%Y-%m-%dT09:30:00Z)"
+          for attempt in {1..10}; do
+            runs_json="$(
+              gh api \
+                "/repos/${GITHUB_REPOSITORY}/actions/workflows/TradeEye-1.0.0.yml/runs?branch=main&event=schedule&status=completed&per_page=20"
+            )"
+            if jq -e --arg cutoff "$cutoff" \
+              '[.workflow_runs[] | select(
+                .display_title == "TradeEye core 0 10 * * 1-5" and
+                .conclusion == "success" and
+                .created_at >= $cutoff
+              )] | length > 0' \
+              <<<"$runs_json" >/dev/null; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 10 ]; then
+              echo "Friday evening batch not complete yet; retry ${attempt}/10."
+              sleep 30
+            fi
+          done
+          echo "No successful Friday evening core batch completed after ${cutoff}."
+          exit 1
+
       - name: Checkout repository
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          ref: main
 
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements.txt
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements-dev.txt
+      - name: Install runtime dependencies
+        run: python -m pip install -r requirements.txt
 
-      - name: Run tests
-        run: python -m pytest
-
-      - name: Run weekly backtest
+      - name: Run weekly recommendation report
         run: python backtest_main.py

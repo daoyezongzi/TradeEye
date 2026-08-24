@@ -1,7 +1,6 @@
 # TradeEye 策略规则参数。改这里即可调参，不用改代码。
 # 缺失的键自动回退代码内默认值。可用环境变量 TRADEEYE_RULES_FILE 指向其他文件做参数实验。
 analysis:
-  llm_score_threshold: 70          # 本地得分 >= 此值才调用 LLM
   status_bands: {strong: 80, candidate: 65, watch: 50}
   rules:
     market_regime: {strong_min: 15, strong_score: 10, weak_max: -15, weak_penalty: -15}
@@ -30,8 +29,37 @@ analysis:
             large_order_rank_min: 0.8, large_order_rank_score: 4}
     penalties: {st_penalty: -40, new_stock_age_days: 120, new_stock_penalty: -25, bj_penalty: -20}
 recommender:
-  short_burst: {volume_ratio_min: 2.0, turnover_min: 5.0, turnover_max: 15.0, pct_chg_min: 2.0}
-  t_active: {amplitude_min: 4.5, amount_min: 500000}
-  long_value: {pe_rank_max: 0.4, mv_rank_min: 0.8}
-  weights: {short_burst: 0.4, t_active: 0.3, long_value: 0.3, multi_dim_bonus: 4}
-  price_ranges: {low: [0, 10], mid: [10, 20]}
+  strategy_version: recommend_v2
+  minimum_quality_score: 55
+  max_results: 5
+  hard_min: null
+  hard_max: null
+  preferred_price_max: 20
+  preferred_price_bonus: 3
+  entry_price_multiplier: 0.98
+  momentum: {pct_chg_min: 0, pct_chg_full: 6, pct_rank_min: 0.5, pct_rank_full: 0.95}
+  close_quality: {close_strength_min: 0.45, close_strength_full: 0.9,
+                  body_pct_min: 0, body_pct_full: 4,
+                  upper_shadow_full: 0.5, upper_shadow_zero: 2.5}
+  volume_funds: {turnover_min: 0.8, turnover_full: 12,
+                 volume_ratio_min: 0.6, volume_ratio_full: 2.5,
+                 amount_rank_min: 0.5, amount_rank_full: 0.95,
+                 net_mf_ratio_min: 0, net_mf_ratio_full: 3,
+                 large_order_net_min: 0, large_order_net_full: 2}
+  risk_gate: {weak_close_max: 0.45, long_upper_shadow_min: 2.5,
+              pct_chg_hot: 8, turnover_hot: 18, volume_ratio_hot: 4,
+              reject_overheat_count: 2}
+etf:
+  enabled: false
+  mode: whitelist
+  codes: []
+  strategy_version: etf_recommend_v1
+  minimum_quality_score: 50
+  max_results: 5
+  entry_price_multiplier: 0.98
+  momentum: {pct_chg_min: 0, pct_chg_full: 5, pct_rank_min: 0.5, pct_rank_full: 0.95}
+  close_quality: {close_strength_min: 0.45, close_strength_full: 0.9,
+                  body_pct_min: 0, body_pct_full: 4,
+                  upper_shadow_full: 0.5, upper_shadow_zero: 2.5}
+  liquidity: {amount_min: 20000, amount_full: 500000,
+              amount_rank_min: 0.5, amount_rank_full: 0.95}

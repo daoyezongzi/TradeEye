@@ -9,6 +9,7 @@ from tradeeye.config import Settings, load_settings
 from tradeeye.logging_utils import configure_logging
 from tradeeye.services.notifier import send_text
 from tradeeye.services.rss import NewsItem, collect_news
+from tradeeye.time_utils import market_today
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,7 @@ def build_news_content(
     report_date: dt.date | None = None,
     template_text: str | None = None,
 ) -> str:
-    date_text = (report_date or dt.date.today()).strftime("%Y-%m-%d")
+    date_text = (report_date or market_today()).strftime("%Y-%m-%d")
     items_block = _build_items_block(news_items)
     template = template_text or _load_template_text(settings)
 
@@ -52,13 +53,18 @@ def main(
     settings = settings or load_settings()
     configure_logging(settings.debug_mode)
 
-    news_items = collector(settings)
+    try:
+        news_items = collector(settings)
+    except Exception:
+        logger.exception("News collection failed before a usable feed response was received")
+        return 1
     if not news_items and not settings.news_push_when_empty:
         logger.info("No news matched filters and NEWS_PUSH_WHEN_EMPTY=false, skip sending")
         return 0
 
-    content = build_news_content(news_items, settings=settings)
-    title = f"{dt.date.today():%Y-%m-%d} 财经新闻简报"
+    report_date = market_today()
+    content = build_news_content(news_items, settings=settings, report_date=report_date)
+    title = f"{report_date:%Y-%m-%d} 财经新闻简报"
     notifier = notifier or _send_news
     if not notifier(content, settings, title):
         logger.error("News workflow finished with notification failure")

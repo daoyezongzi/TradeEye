@@ -1,87 +1,90 @@
-name: Stock Analysis Automation
+name: TradeEye Core Automation
+run-name: TradeEye core ${{ github.event.schedule || inputs.job_type || 'manual' }}
 
 on:
   schedule:
+    # 06:00 Asia/Shanghai: generate recommendations from the latest completed session.
     - cron: "0 22 * * 0-4"
-    - cron: "30 7 * * 1-5"
+    # 18:00 Asia/Shanghai: settle trades/NAV first, then run post-close diagnostics.
+    - cron: "0 10 * * 1-5"
   workflow_dispatch:
     inputs:
       job_type:
-        description: "Select which job to run"
+        description: "Select which batch to run"
         required: true
         default: "recommend"
         type: choice
         options:
           - recommend
+          - evening
+          - settle
           - analysis
 
 permissions:
   contents: write
 
+concurrency:
+  group: tradeeye-data-writer
+  cancel-in-progress: false
+
 jobs:
-  trade_eye_job:
+  core_batch:
     runs-on: ubuntu-latest
     env:
       TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
-      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-      LLM_BASE_URL: ${{ vars.LLM_BASE_URL || 'https://api.deepseek.com' }}
-      LLM_MODEL: ${{ vars.LLM_MODEL || 'deepseek-v4-flash' }}
-      LLM_TIMEOUT_SEC: ${{ vars.LLM_TIMEOUT_SEC || '60' }}
       FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
-      RECOMMENDER_INDUSTRIES: ${{ vars.RECOMMENDER_INDUSTRIES }}
+      MY_STOCKS: ${{ vars.MY_STOCKS || '600370.SH,600157.SH,603010.SH,002372.SZ,600905.SH,600009.SH,600010.SH' }}
+      ALLOWED_EXCHANGES: ${{ vars.ALLOWED_EXCHANGES || 'SH,SZ,BJ' }}
+      TRADEEYE_RULES_FILE: ${{ vars.TRADEEYE_RULES_FILE || '' }}
       DEBUG_MODE: "false"
 
     steps:
-      - name: Smart random delay for scheduled runs
-        shell: bash
-        run: |
-          if [ "${{ github.event_name }}" = "schedule" ]; then
-            echo "Scheduled run: applying random delay..."
-            sleep $(( (RANDOM % 30) * 60 ))
-          else
-            echo "Manual dispatch: skip delay and run now."
-          fi
-
-      - name: Checkout repository
+      - name: Checkout main
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          ref: main
 
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements.txt
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
+      - name: Install runtime dependencies
+        run: python -m pip install -r requirements.txt
 
-          python -m pip install -r requirements-dev.txt
-
-
-      - name: Run tests
-        run: python -m pytest
-
-      - name: Run daily recommendations (REC)
+      - name: Run daily recommendations
         if: >
           (github.event_name == 'schedule' && github.event.schedule == '0 22 * * 0-4') ||
           (github.event_name == 'workflow_dispatch' && github.event.inputs.job_type == 'recommend')
         run: python recommend_main.py
 
-      - name: Run stock review analysis (STK)
+      - name: Settle recommendation trades and NAV
         if: >
-          (github.event_name == 'schedule' && github.event.schedule == '30 7 * * 1-5') ||
-          (github.event_name == 'workflow_dispatch' && github.event.inputs.job_type == 'analysis')
+          (github.event_name == 'schedule' && github.event.schedule == '0 10 * * 1-5') ||
+          (github.event_name == 'workflow_dispatch' &&
+            (github.event.inputs.job_type == 'evening' || github.event.inputs.job_type == 'settle'))
+        run: python portfolio_main.py
+
+      - name: Run post-close stock diagnostics
+        if: >
+          (github.event_name == 'schedule' && github.event.schedule == '0 10 * * 1-5') ||
+          (github.event_name == 'workflow_dispatch' &&
+            (github.event.inputs.job_type == 'evening' || github.event.inputs.job_type == 'analysis'))
         run: python main.py
 
-      - name: Commit signal data
+      - name: Commit generated state
+        if: always()
         shell: bash
         run: |
-          if [ -z "$(git status --porcelain data/signals/ 2>/dev/null)" ]; then
-            echo "No signal changes to commit."
+          git add -f data/signals/ data/trades/ data/portfolio/ 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "No state changes to commit."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/signals/
-          git commit -m "chore: record signals $(date -u +%Y-%m-%d) [skip ci]"
+          git commit -m "chore: record TradeEye state $(date -u +%Y-%m-%d) [skip ci]"
           git pull --rebase origin main
-          git push origin HEAD:main || (git pull --rebase origin main && git push origin HEAD:main)
+          git push origin HEAD:main

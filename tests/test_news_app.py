@@ -12,7 +12,6 @@ def _make_settings(**kwargs) -> Settings:
         debug_mode=True,
         my_stocks=[],
         allowed_exchanges=("SH", "SZ", "BJ"),
-        recommender_industries=(),
         news_rss_feeds=(),
         news_rss_feeds_file="tradeeye/resources/news_feeds.txt",
         news_lookback_hours=24,
@@ -21,7 +20,6 @@ def _make_settings(**kwargs) -> Settings:
         news_exclude_keywords=(),
         news_push_when_empty=False,
         news_template_file="tradeeye/resources/news_template.txt",
-        llm_api_key="llm-key",
     )
     base.update(kwargs)
     return Settings(**base)
@@ -116,3 +114,12 @@ def test_main_returns_nonzero_when_notification_fails():
     exit_code = main(settings=settings, collector=lambda _settings: [], notifier=fake_notifier)
 
     assert exit_code == 1
+
+
+def test_main_returns_nonzero_when_collection_fails():
+    settings = _make_settings()
+
+    def failed_collector(_settings):
+        raise RuntimeError("all feeds unavailable")
+
+    assert main(settings=settings, collector=failed_collector) == 1

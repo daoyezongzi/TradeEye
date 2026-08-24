@@ -30,6 +30,10 @@ class NewsItem:
 FeedFetcher = Callable[[str], list[NewsItem]]
 
 
+class NewsCollectionError(RuntimeError):
+    """Raised when feeds were configured but none could be fetched."""
+
+
 def fetch_feed(
     url: str,
     timeout: int = 10,
@@ -55,11 +59,16 @@ def collect_news(
         return []
 
     all_items: list[NewsItem] = []
+    successful_feeds = 0
     for url in feed_urls:
         try:
             all_items.extend(fetcher(url))
+            successful_feeds += 1
         except Exception:
             logger.exception("Failed to pull RSS feed: %s", url)
+
+    if successful_feeds == 0:
+        raise NewsCollectionError(f"All {len(feed_urls)} configured RSS feeds failed")
 
     filtered_items = filter_news(
         all_items,

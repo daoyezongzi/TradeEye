@@ -1,4 +1,6 @@
-from tradeeye.strategies.strategy import check_signals
+from copy import deepcopy
+
+from tradeeye.strategies.strategy import DIMENSION_CAPS, check_signals
 
 
 def make_strong_payload():
@@ -65,26 +67,78 @@ def make_weak_payload():
     }
 
 
-def test_check_signals_returns_high_score_for_strong_overnight_setup():
+def test_check_signals_scores_five_capped_dimensions():
     result = check_signals(make_strong_payload())
 
-    assert result["score"] == 100
-    assert result["status"] == "【强候选】尾盘隔夜"
-    assert result["vol_ratio"] == 1.8
-    assert "尾盘承接较强" in result["detail"]
+    assert result["dimensions"] == DIMENSION_CAPS
+    assert sum(result["dimensions"].values()) == result["raw_score"] == 100
+    assert result["raw_band"] == "强"
+    assert result["risk_level"] == "低风险"
+    assert result["final_status"] == result["status"] == "强"
+    assert "买入" not in result["action_plan"]
 
 
-def test_check_signals_penalizes_weak_and_high_risk_setup():
+def test_check_signals_keeps_raw_score_when_hard_risk_overrides_status():
     result = check_signals(make_weak_payload())
 
-    assert result["score"] == 0
-    assert result["status"] == "【回避】"
+    assert result["raw_score"] == 0
+    assert result["raw_band"] == "弱"
+    assert result["risk_level"] == "高风险"
+    assert result["final_status"] == "高风险"
+    assert set(result["dimensions"]) == set(DIMENSION_CAPS)
     assert "ST" in result["risk"]
-    assert "放弃本次隔夜交易" in result["action_plan"]
 
 
-def test_check_signals_handles_missing_payload():
+def test_medium_risk_caps_strong_structure_at_watch():
+    payload = deepcopy(make_strong_payload())
+    payload["latest"]["list_age_days"] = 60
+
+    result = check_signals(payload)
+
+    assert result["raw_score"] == 100
+    assert result["raw_band"] == "强"
+    assert result["risk_level"] == "中风险"
+    assert result["final_status"] == "观察"
+
+
+def test_missing_key_data_is_not_scored():
+    payload = deepcopy(make_strong_payload())
+    del payload["latest"]["net_mf_ratio_pct"]
+
+    result = check_signals(payload)
+
+    assert result["score"] is None
+    assert result["raw_score"] is None
+    assert result["status"] == "数据不足"
+    assert result["data_quality"] == "数据不足"
+    assert "latest.net_mf_ratio_pct" in result["missing_fields"]
+    assert all(value is None for value in result["dimensions"].values())
+
+
+def test_degraded_upstream_source_is_not_scored_as_zero():
+    payload = make_strong_payload()
+    payload["degraded_sources"] = ["moneyflow"]
+
+    result = check_signals(payload)
+
+    assert result["raw_score"] is None
+    assert result["status"] == "数据不足"
+    assert "data_source.moneyflow" in result["missing_fields"]
+
+
+def test_stock_specific_auxiliary_gap_is_not_treated_as_real_zero():
+    payload = make_strong_payload()
+    payload["latest"]["moneyflow_available"] = False
+
+    result = check_signals(payload)
+
+    assert result["raw_score"] is None
+    assert "data_source.moneyflow.000001.SZ" in result["missing_fields"]
+
+
+def test_check_signals_handles_missing_payload_without_pseudo_score():
     result = check_signals({})
 
-    assert result["score"] == 0
-    assert result["status"] == "【数据缺失】"
+    assert result["score"] is None
+    assert result["status"] == "数据不足"
+    assert result["missing_fields"] == ["latest"]

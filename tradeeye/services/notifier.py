@@ -44,6 +44,7 @@ def send_text(
             timeout=10,
         )
         response.raise_for_status()
+        _validate_feishu_response(response)
         return True
     except Exception:
         logger.exception("Feishu notification failed")
@@ -58,3 +59,18 @@ def send_report(content: str, settings: Settings, http_client=requests) -> bool:
         icon="\U0001f4ca",
         http_client=http_client,
     )
+
+
+def _validate_feishu_response(response) -> None:
+    try:
+        payload = response.json()
+    except Exception as exc:
+        raise RuntimeError("Feishu webhook returned a non-JSON response") from exc
+
+    if not isinstance(payload, dict):
+        raise RuntimeError("Feishu webhook returned an invalid response payload")
+
+    code = payload.get("code", payload.get("StatusCode"))
+    if code not in (0, "0"):
+        message = payload.get("msg", payload.get("StatusMessage", "unknown error"))
+        raise RuntimeError(f"Feishu webhook rejected the message: code={code}, message={message}")

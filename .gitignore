@@ -3,6 +3,8 @@ __pycache__/
 *.pyc
 *.csv
 !data/signals/*.csv
+!data/trades/*.csv
+!data/portfolio/*.csv
 debug_data/
 venv/
 .tmp/

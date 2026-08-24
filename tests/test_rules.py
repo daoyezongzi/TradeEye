@@ -1,94 +1,158 @@
-from tradeeye.strategies.rules import Rules, load_rules
+from __future__ import annotations
+
+import pytest
+
+import tradeeye.strategies.rules as rules_module
+from tradeeye.strategies.rules import (
+    DEFAULT_RULES_FILE,
+    EtfMode,
+    Rules,
+    RulesValidationError,
+    load_rules,
+)
 
 
-def test_defaults_match_current_hardcoded_values():
+def test_defaults_expose_recommend_v2_and_disabled_etf_whitelist():
     rules = Rules()
-    assert rules.analysis.llm_score_threshold == 70
+
     assert rules.analysis.status_bands.strong == 80
-    assert rules.analysis.status_bands.candidate == 65
-    assert rules.analysis.status_bands.watch == 50
     assert rules.analysis.rules.ma_alignment.full_score == 18
-    assert rules.analysis.rules.close_strength.strong_min == 0.8
-    assert rules.analysis.rules.pct_chg.sweet_max == 6.5
-    assert rules.analysis.rules.penalties.st_penalty == -40
-    assert rules.analysis.rules.penalties.new_stock_age_days == 120
-    assert rules.recommender.short_burst.volume_ratio_min == 2.0
-    assert rules.recommender.t_active.amount_min == 500_000
-    assert rules.recommender.long_value.pe_rank_max == 0.4
-    assert rules.recommender.weights.short_burst == 0.4
-    assert rules.recommender.weights.multi_dim_bonus == 4.0
-    assert rules.recommender.price_ranges.low == (0.0, 10.0)
-    assert rules.recommender.price_ranges.mid == (10.0, 20.0)
-    assert rules.recommender.price_ranges.max_price == 20.0
+    assert rules.recommender.strategy_version == "recommend_v2"
+    assert rules.recommender.minimum_quality_score == 55
+    assert rules.recommender.max_results == 5
+    assert rules.recommender.hard_min is None
+    assert rules.recommender.hard_max is None
+    assert rules.recommender.preferred_price_max == 20
+    assert rules.recommender.preferred_price_bonus == 3
+    assert rules.recommender.entry_price_multiplier == 0.98
+    assert rules.etf.enabled is False
+    assert rules.etf.mode is EtfMode.WHITELIST
+    assert rules.etf.codes == ()
+    assert rules.etf.strategy_version == "etf_recommend_v1"
 
 
-def test_load_rules_missing_file_returns_defaults(tmp_path):
-    assert load_rules(tmp_path / "missing.yaml") == Rules()
+def test_load_rules_explicit_missing_file_raises(tmp_path):
+    missing = tmp_path / "missing.yaml"
+
+    with pytest.raises(RulesValidationError, match=r"Rules file does not exist: .*missing\.yaml"):
+        load_rules(missing)
 
 
-def test_load_rules_overrides_and_keeps_unset_fields(tmp_path):
+def test_load_rules_env_missing_file_raises(tmp_path, monkeypatch):
+    missing = tmp_path / "missing-env.yaml"
+    monkeypatch.setenv("TRADEEYE_RULES_FILE", str(missing))
+
+    with pytest.raises(RulesValidationError, match=r"Rules file does not exist: .*missing-env\.yaml"):
+        load_rules()
+
+
+def test_load_rules_missing_packaged_file_raises(tmp_path, monkeypatch):
+    missing = tmp_path / "missing-packaged.yaml"
+    monkeypatch.delenv("TRADEEYE_RULES_FILE", raising=False)
+    monkeypatch.setattr(rules_module, "DEFAULT_RULES_FILE", missing)
+
+    with pytest.raises(RulesValidationError, match=r"Rules file does not exist: .*missing-packaged\.yaml"):
+        load_rules()
+
+
+def test_load_rules_empty_yaml_returns_defaults(tmp_path):
+    yaml_file = tmp_path / "empty.yaml"
+    yaml_file.write_text("", encoding="utf-8")
+
+    assert load_rules(yaml_file) == Rules()
+
+
+def test_load_rules_strictly_supports_string_bool_list_enum_and_null(tmp_path):
     yaml_file = tmp_path / "rules.yaml"
     yaml_file.write_text(
-        "analysis:\n"
-        "  llm_score_threshold: 55\n"
-        "  rules:\n"
-        "    turnover: {sweet_min: 3}\n"
         "recommender:\n"
-        "  weights: {short_burst: 0.5}\n"
-        "  price_ranges: {low: [0, 8]}\n",
+        "  strategy_version: recommend_v2_custom\n"
+        "  hard_min: null\n"
+        "  hard_max: 88\n"
+        "  preferred_price_bonus: 2.5\n"
+        "  momentum: {pct_chg_full: 7}\n"
+        "etf:\n"
+        "  enabled: true\n"
+        "  mode: whitelist\n"
+        "  codes: [510300.SH, 159915.SZ]\n",
         encoding="utf-8",
     )
+
     rules = load_rules(yaml_file)
-    assert rules.analysis.llm_score_threshold == 55
-    assert rules.analysis.rules.turnover.sweet_min == 3
-    assert rules.analysis.rules.turnover.sweet_max == 12  # 未覆盖字段保持默认
-    assert rules.recommender.weights.short_burst == 0.5
-    assert rules.recommender.price_ranges.low == (0.0, 8.0)
-    assert rules.recommender.price_ranges.mid == (10.0, 20.0)
+
+    assert rules.recommender.strategy_version == "recommend_v2_custom"
+    assert rules.recommender.hard_min is None
+    assert rules.recommender.hard_max == 88.0
+    assert rules.recommender.preferred_price_bonus == 2.5
+    assert rules.recommender.momentum.pct_chg_full == 7.0
+    assert rules.recommender.momentum.pct_chg_min == 0.0
+    assert rules.etf.enabled is True
+    assert rules.etf.mode is EtfMode.WHITELIST
+    assert rules.etf.codes == ("510300.SH", "159915.SZ")
 
 
-def test_load_rules_invalid_yaml_falls_back(tmp_path):
+@pytest.mark.parametrize(
+    "yaml_text, expected_path",
+    [
+        ("etf: {enabled: 'false'}\n", "rules.etf.enabled"),
+        ("etf: {mode: 1}\n", "rules.etf.mode"),
+        ("etf: {codes: 510300.SH}\n", "rules.etf.codes"),
+        ("recommender: {strategy_version: 2}\n", "rules.recommender.strategy_version"),
+        ("recommender: {hard_min: 'null'}\n", "rules.recommender.hard_min"),
+    ],
+)
+def test_load_rules_rejects_wrong_scalar_types(tmp_path, yaml_text, expected_path):
+    yaml_file = tmp_path / "rules.yaml"
+    yaml_file.write_text(yaml_text, encoding="utf-8")
+
+    with pytest.raises(RulesValidationError, match=expected_path):
+        load_rules(yaml_file)
+
+
+def test_load_rules_rejects_unknown_keys(tmp_path):
+    yaml_file = tmp_path / "rules.yaml"
+    yaml_file.write_text("recommender:\n  momentum:\n    typo_threshold: 3\n", encoding="utf-8")
+
+    with pytest.raises(RulesValidationError, match=r"rules\.recommender\.momentum\.typo_threshold"):
+        load_rules(yaml_file)
+
+
+@pytest.mark.parametrize(
+    "yaml_text, expected_message",
+    [
+        ("recommender: {hard_min: 30, hard_max: 20}\n", "hard_min cannot exceed hard_max"),
+        ("recommender: {minimum_quality_score: 101}\n", "minimum_quality_score"),
+        ("recommender: {max_results: 6}\n", "max_results"),
+        ("recommender:\n  momentum: {pct_chg_min: 6, pct_chg_full: 6}\n", "pct_chg"),
+        ("etf: {mode: all}\n", "must be one of"),
+        ("etf: {codes: [510300.SH, BAD]}\n", "invalid ETF code"),
+        ("etf: {codes: [510300.SH, 510300.SH]}\n", "duplicates"),
+    ],
+)
+def test_load_rules_rejects_semantically_invalid_values(tmp_path, yaml_text, expected_message):
+    yaml_file = tmp_path / "rules.yaml"
+    yaml_file.write_text(yaml_text, encoding="utf-8")
+
+    with pytest.raises(RulesValidationError, match=expected_message):
+        load_rules(yaml_file)
+
+
+def test_load_rules_invalid_yaml_raises_clear_error(tmp_path):
     yaml_file = tmp_path / "rules.yaml"
     yaml_file.write_text("analysis: [unclosed", encoding="utf-8")
-    assert load_rules(yaml_file) == Rules()
 
-
-def test_load_rules_invalid_value_type_ignored(tmp_path):
-    yaml_file = tmp_path / "rules.yaml"
-    yaml_file.write_text("analysis:\n  llm_score_threshold: not-a-number\n", encoding="utf-8")
-    assert load_rules(yaml_file) == Rules()
+    with pytest.raises(RulesValidationError, match="Cannot parse rules file"):
+        load_rules(yaml_file)
 
 
 def test_packaged_rules_yaml_exists_and_matches_defaults():
-    from tradeeye.strategies.rules import DEFAULT_RULES_FILE
-
     assert DEFAULT_RULES_FILE.exists()
     assert load_rules(DEFAULT_RULES_FILE) == Rules()
 
 
 def test_load_rules_env_override(tmp_path, monkeypatch):
     yaml_file = tmp_path / "custom.yaml"
-    yaml_file.write_text("analysis: {llm_score_threshold: 60}\n", encoding="utf-8")
+    yaml_file.write_text("recommender: {minimum_quality_score: 60}\n", encoding="utf-8")
     monkeypatch.setenv("TRADEEYE_RULES_FILE", str(yaml_file))
-    assert load_rules().analysis.llm_score_threshold == 60
 
-
-def test_check_signals_respects_rule_overrides():
-    from dataclasses import replace
-
-    from tradeeye.strategies.rules import AnalysisRules, StatusBands
-    from tradeeye.strategies.strategy import check_signals
-
-    data = {
-        "name": "Test Co",
-        "market_regime": {"status": "中性", "score": 0},
-        "latest": {"close": 10.5, "open": 10.0, "ma5": 10.2, "ma10": 10.0, "ma20": 9.8,
-                   "pct_chg": 2.0, "close_strength": 0.9, "list_age_days": 600},
-        "prev": {"low": 9.7},
-    }
-    default_result = check_signals(data, rules=AnalysisRules())
-    # 把强候选门槛降到 1 分，status 应变为强候选
-    lowered = replace(AnalysisRules(), status_bands=StatusBands(strong=1, candidate=0, watch=0))
-    lowered_result = check_signals(data, rules=lowered)
-    assert default_result["status"] != lowered_result["status"]
-    assert lowered_result["status"] == "【强候选】尾盘隔夜"
+    assert load_rules().recommender.minimum_quality_score == 60

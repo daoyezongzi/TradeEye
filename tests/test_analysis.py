@@ -1,132 +1,78 @@
-﻿import json
-
-from tradeeye.config import Settings
-from tradeeye.services.analysis import get_llm_analysis, get_llm_recommendation_analysis, run_llm_call
+from tradeeye.services.analysis import build_analysis_report
+from tradeeye.strategies.strategy import DIMENSION_CAPS
 
 
-class _DummyResponse:
-    def __init__(self, payload: dict):
-        self._payload = payload
+def test_build_analysis_report_contains_required_diagnostic_sections():
+    result = {
+        "raw_score": 100,
+        "risk_level": "低风险",
+        "final_status": "强",
+        "dimensions": dict(DIMENSION_CAPS),
+        "reasons": ["收盘位于多头排列上方", "资金净流入为正"],
+        "risk": "未发现主要风险",
+        "next_day_watch": ["观察次日收盘能否守住 MA5", "观察量能是否保持常态"],
+    }
 
-    def raise_for_status(self):
-        return None
-
-    def json(self):
-        return self._payload
-
-
-class _DummyHttpClient:
-    def __init__(self):
-        self.last_request = None
-
-    def post(self, url, headers, json, timeout):
-        self.last_request = {
-            "url": url,
-            "headers": headers,
-            "json": json,
-            "timeout": timeout,
-        }
-        return _DummyResponse({"choices": [{"message": {"content": "workflow-ok"}}]})
-
-
-def make_settings() -> Settings:
-    return Settings(
-        tushare_token="token",
-        feishu_webhook="https://example.com",
-        debug_mode=True,
-        my_stocks=[],
-        allowed_exchanges=("SH", "SZ", "BJ"),
-        llm_api_key="llm-key",
-        llm_base_url="https://api.deepseek.com",
-        llm_model="deepseek-v4-flash",
-        llm_timeout_sec=60,
+    report = build_analysis_report(
+        {"name": "Alpha Corp", "trade_date": "20260822"},
+        result,
+        "600001.SH",
     )
 
+    assert "【Alpha Corp (600001.SH)】" in report
+    assert "趋势结构：30/30" in report
+    assert "收盘与价格行为：25/25" in report
+    assert "量能与流动性：20/20" in report
+    assert "资金确认：15/15" in report
+    assert "市场环境：10/10" in report
+    assert "原始总分：100/100" in report
+    assert "风险等级：低风险" in report
+    assert "最终状态：强" in report
+    assert "主要依据：" in report
+    assert "次日观察点：" in report
 
-def test_get_llm_recommendation_analysis_uses_rec_prompt_and_payload():
-    settings = make_settings()
-    http_client = _DummyHttpClient()
-    raw_json = json.dumps(
-        {
-            "low_price_group": [{"ts_code": "600001.SH"}],
-            "mid_price_group": [{"ts_code": "000001.SZ"}],
+
+def test_build_analysis_report_marks_missing_data_as_unscored():
+    result = {
+        "raw_score": None,
+        "risk_level": "无法判定",
+        "final_status": "数据不足",
+        "dimensions": {name: None for name in DIMENSION_CAPS},
+        "reasons": ["缺少关键数据：latest.ma20"],
+        "risk": "关键数据缺失，无法判定风险等级",
+        "next_day_watch": ["补齐完整盘后行情后再观察结构变化"],
+    }
+
+    report = build_analysis_report({}, result, "600001.SH")
+
+    assert "趋势结构：不评分/30" in report
+    assert "原始总分：不评分" in report
+    assert "最终状态：数据不足" in report
+    assert "latest.ma20" in report
+
+
+def test_build_analysis_report_is_deterministic_and_contains_no_trade_instruction():
+    result = {
+        "raw_score": 72,
+        "risk_level": "中风险",
+        "final_status": "观察",
+        "dimensions": {
+            "趋势结构": 24,
+            "收盘与价格行为": 18,
+            "量能与流动性": 14,
+            "资金确认": 9,
+            "市场环境": 7,
         },
-        ensure_ascii=False,
-    )
-
-    result = get_llm_recommendation_analysis(
-        recommendations_json=raw_json,
-        settings=settings,
-        input_key="daily_candidates",
-        http_client=http_client,
-    )
-
-    assert result == "workflow-ok"
-    req = http_client.last_request
-    assert req is not None
-    assert req["url"] == "https://api.deepseek.com/chat/completions"
-    assert req["json"]["model"] == "deepseek-v4-flash"
-    assert req["json"]["temperature"] == 0.7
-    parsed = json.loads(req["json"]["messages"][1]["content"])
-    assert set(parsed.keys()) == {"low_price_group", "mid_price_group"}
-
-
-def test_get_llm_analysis_uses_stk_prompt_and_payload():
-    settings = make_settings()
-    http_client = _DummyHttpClient()
-
-    stock_data = {
-        "name": "Alpha Corp",
-        "trade_date": "20260425",
-        "latest": {"close": 10.5, "pct_chg": 3.1, "ma5": 10.1, "ma10": 9.8, "ma20": 9.6, "high": 10.8, "low": 10.0},
-        "prev": {"low": 9.9},
-        "market_regime": {"up_ratio_pct": 55, "strong_ratio_pct": 8},
+        "reasons": ["结构保持稳定"],
+        "risk": "上市时间较短",
+        "next_day_watch": ["观察结构是否保持稳定"],
     }
-    tech_result = {
-        "status": "candidate",
-        "score": 82,
-        "close_strength": 0.85,
-        "vol_ratio": 2.2,
-        "turnover_rate": 8.1,
-        "amount_ratio_5d": 1.6,
-        "net_mf_ratio_pct": 3.2,
-        "large_order_net_pct": 1.5,
-        "up_limit_room_pct": 4.3,
-        "breakout_pct": 1.1,
-        "market_bias": "strong",
-        "detail": "tail strong",
-        "risk": "none",
-        "action_plan": "observe",
-    }
+    stock = {"name": "Beta", "trade_date": "20260822"}
 
-    result = get_llm_analysis(
-        stock_data=stock_data,
-        tech_result=tech_result,
-        stock_code="600001.SH",
-        settings=settings,
-        http_client=http_client,
-    )
+    first = build_analysis_report(stock, result, "000001.SZ")
+    second = build_analysis_report(stock, result, "000001.SZ")
 
-    assert result == "workflow-ok"
-    req = http_client.last_request
-    assert req is not None
-    assert req["json"]["temperature"] == 0.0
-    user_content = req["json"]["messages"][1]["content"]
-    assert "600001.SH" in user_content
-    assert not user_content.startswith("[STK]")
-
-
-def test_run_llm_call_accepts_legacy_mapping_input():
-    settings = make_settings()
-    http_client = _DummyHttpClient()
-
-    result = run_llm_call(
-        query={"stock_data": "legacy-content"},
-        settings=settings,
-        http_client=http_client,
-        log_key="legacy",
-    )
-
-    assert result == "workflow-ok"
-    assert http_client.last_request is not None
-    assert http_client.last_request["json"]["messages"][1]["content"] == "legacy-content"
+    assert first == second
+    assert "LLM" not in first
+    for forbidden in ("买入", "加仓", "卖出", "止盈", "轻仓"):
+        assert forbidden not in first

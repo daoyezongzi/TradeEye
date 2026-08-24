@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Iterable
@@ -19,16 +20,13 @@ DEFAULT_STOCKS = (
     "600010.SH",
 )
 DEFAULT_ALLOWED_EXCHANGES = ("SH", "SZ", "BJ")
-DEFAULT_RECOMMENDER_INDUSTRIES: tuple[str, ...] = ()
 DEFAULT_NEWS_LOOKBACK_HOURS = 24
 DEFAULT_NEWS_MAX_ITEMS = 15
 DEFAULT_NEWS_PUSH_WHEN_EMPTY = False
 DEFAULT_NEWS_FEEDS_FILE = "tradeeye/resources/news_feeds.txt"
 DEFAULT_NEWS_TEMPLATE_FILE = "tradeeye/resources/news_template.txt"
-DEFAULT_LLM_BASE_URL = "https://api.deepseek.com"
-DEFAULT_LLM_MODEL = "deepseek-v4-flash"
-DEFAULT_LLM_TIMEOUT_SEC = 60
 DEFAULT_BACKTEST_LOOKBACK_DAYS = 45
+STOCK_CODE_PATTERN = re.compile(r"^\d{6}\.(?:SH|SZ|BJ)$")
 
 EXCHANGE_ALIASES = {
     "SH": {"SH", "SSE", "沪", "沪市", "上海", "上交所", "上海证券交易所"},
@@ -62,8 +60,14 @@ def parse_stock_list(value: str | None, default: Iterable[str] = DEFAULT_STOCKS)
     if not value:
         return list(default)
 
-    stocks = [item.strip() for item in value.split(",")]
-    return [item for item in stocks if item] or list(default)
+    normalized_value = value.replace("，", ",")
+    stocks = [item.strip().upper() for item in normalized_value.split(",") if item.strip()]
+    invalid = [stock for stock in stocks if not STOCK_CODE_PATTERN.fullmatch(stock)]
+    if invalid:
+        raise ValueError(f"MY_STOCKS contains invalid stock codes: {', '.join(invalid)}")
+    if not stocks:
+        raise ValueError("MY_STOCKS must contain at least one valid stock code")
+    return list(dict.fromkeys(stocks))
 
 
 def parse_csv_list(value: str | None, default: Iterable[str] = ()) -> tuple[str, ...]:
@@ -96,25 +100,22 @@ def parse_exchange_list(
     normalized_value = value.replace("，", ",").replace(" ", ",")
     tokens = [item.strip() for item in normalized_value.split(",") if item.strip()]
     exchanges: list[str] = []
+    invalid_tokens: list[str] = []
 
     for token in tokens:
-        for exchange in _expand_exchange_token(token):
+        expanded = _expand_exchange_token(token)
+        if not expanded:
+            invalid_tokens.append(token)
+            continue
+        for exchange in expanded:
             if exchange not in exchanges:
                 exchanges.append(exchange)
 
-    return tuple(exchanges or tuple(default))
-
-
-def parse_industry_list(
-    value: str | None,
-    default: Iterable[str] = DEFAULT_RECOMMENDER_INDUSTRIES,
-) -> tuple[str, ...]:
-    if not value:
-        return tuple(default)
-
-    normalized_value = value.replace("，", ",")
-    tokens = [item.strip() for item in normalized_value.split(",") if item.strip()]
-    return tuple(dict.fromkeys(tokens)) or tuple(default)
+    if invalid_tokens:
+        raise ValueError(f"ALLOWED_EXCHANGES contains invalid values: {', '.join(invalid_tokens)}")
+    if not exchanges:
+        raise ValueError("ALLOWED_EXCHANGES must contain at least one supported exchange")
+    return tuple(exchanges)
 
 
 def extract_exchange(code: str) -> str:
@@ -147,7 +148,6 @@ class Settings:
     debug_mode: bool
     my_stocks: list[str]
     allowed_exchanges: tuple[str, ...]
-    recommender_industries: tuple[str, ...] = DEFAULT_RECOMMENDER_INDUSTRIES
     news_rss_feeds: tuple[str, ...] = ()
     news_rss_feeds_file: str = DEFAULT_NEWS_FEEDS_FILE
     news_lookback_hours: int = DEFAULT_NEWS_LOOKBACK_HOURS
@@ -156,15 +156,21 @@ class Settings:
     news_exclude_keywords: tuple[str, ...] = ()
     news_push_when_empty: bool = DEFAULT_NEWS_PUSH_WHEN_EMPTY
     news_template_file: str = DEFAULT_NEWS_TEMPLATE_FILE
-    llm_api_key: str = ""
-    llm_base_url: str = DEFAULT_LLM_BASE_URL
-    llm_model: str = DEFAULT_LLM_MODEL
-    llm_timeout_sec: int = DEFAULT_LLM_TIMEOUT_SEC
     backtest_lookback_days: int = DEFAULT_BACKTEST_LOOKBACK_DAYS
 
-    @property
-    def llm_chat_completions_url(self) -> str:
-        return f"{self.llm_base_url.rstrip('/')}/chat/completions"
+    def __post_init__(self) -> None:
+        invalid_stocks = [
+            stock for stock in self.my_stocks if not STOCK_CODE_PATTERN.fullmatch(str(stock).upper())
+        ]
+        if invalid_stocks:
+            raise ValueError(f"Invalid stock codes: {', '.join(invalid_stocks)}")
+
+        invalid_exchanges = [
+            exchange for exchange in self.allowed_exchanges if exchange.upper() not in DEFAULT_ALLOWED_EXCHANGES
+        ]
+        if invalid_exchanges or not self.allowed_exchanges:
+            details = ", ".join(invalid_exchanges) or "empty list"
+            raise ValueError(f"Invalid allowed exchanges: {details}")
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -174,7 +180,6 @@ class Settings:
             debug_mode=parse_bool(os.getenv("DEBUG_MODE"), default=False),
             my_stocks=parse_stock_list(os.getenv("MY_STOCKS")),
             allowed_exchanges=parse_exchange_list(os.getenv("ALLOWED_EXCHANGES")),
-            recommender_industries=parse_industry_list(os.getenv("RECOMMENDER_INDUSTRIES")),
             news_rss_feeds=parse_csv_list(os.getenv("NEWS_RSS_FEEDS")),
             news_rss_feeds_file=(
                 os.getenv("NEWS_RSS_FEEDS_FILE", DEFAULT_NEWS_FEEDS_FILE).strip() or DEFAULT_NEWS_FEEDS_FILE
@@ -197,14 +202,6 @@ class Settings:
             ),
             news_template_file=(
                 os.getenv("NEWS_TEMPLATE_FILE", DEFAULT_NEWS_TEMPLATE_FILE).strip() or DEFAULT_NEWS_TEMPLATE_FILE
-            ),
-            llm_api_key=os.getenv("LLM_API_KEY", "").strip(),
-            llm_base_url=(os.getenv("LLM_BASE_URL", DEFAULT_LLM_BASE_URL).strip() or DEFAULT_LLM_BASE_URL),
-            llm_model=(os.getenv("LLM_MODEL", DEFAULT_LLM_MODEL).strip() or DEFAULT_LLM_MODEL),
-            llm_timeout_sec=parse_int(
-                os.getenv("LLM_TIMEOUT_SEC"),
-                default=DEFAULT_LLM_TIMEOUT_SEC,
-                minimum=1,
             ),
             backtest_lookback_days=parse_int(
                 os.getenv("BACKTEST_LOOKBACK_DAYS"),

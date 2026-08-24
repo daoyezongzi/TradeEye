@@ -1,24 +1,25 @@
-﻿import datetime as dt
+import datetime as dt
+import inspect
 
 from tradeeye.app import build_final_content, main
 from tradeeye.config import Settings
 
 
-def make_settings(debug_mode: bool = True) -> Settings:
+def make_settings(debug_mode: bool = True, stocks: list[str] | None = None) -> Settings:
     return Settings(
         tushare_token="token",
         feishu_webhook="https://example.com",
         debug_mode=debug_mode,
-        my_stocks=["000001.SZ"],
+        my_stocks=stocks or ["000001.SZ"],
         allowed_exchanges=("SH", "SZ", "BJ"),
-        llm_api_key="llm-key",
     )
 
 
 def make_strong_payload():
     return {
         "name": "Momentum Corp",
-        "market_regime": {"status": "strong", "score": 20},
+        "trade_date": "20260822",
+        "market_regime": {"status": "偏强", "score": 20},
         "latest": {
             "ts_code": "000001.SZ",
             "close": 10.4,
@@ -41,7 +42,7 @@ def make_strong_payload():
             "net_mf_ratio_rank": 0.87,
             "large_order_net_rank": 0.83,
             "list_age_days": 600,
-            "market": "main",
+            "market": "主板",
         },
         "prev": {"vol": 100, "low": 9.7},
     }
@@ -49,7 +50,9 @@ def make_strong_payload():
 
 def test_build_final_content_uses_report_date():
     content = build_final_content(["report-a", "report-b"], report_date=dt.date(2026, 4, 9))
+
     assert "2026-04-09" in content
+    assert "盘后诊断汇总报告" in content
     assert "report-a" in content
     assert "report-b" in content
 
@@ -66,33 +69,38 @@ def test_build_final_content_lists_failed_codes():
     assert "000002.SZ" in content
 
 
-def test_main_runs_end_to_end_with_injected_services():
+def test_main_runs_every_stock_through_local_deterministic_report():
     calls: list[str] = []
 
     def fake_fetcher(code, settings):
         calls.append(f"fetch:{code}")
-        payload = make_strong_payload()
-        payload["latest"]["ts_code"] = code
-        return payload
+        return make_strong_payload()
 
-    def fake_analyzer(stock_data, tech_result, stock_code, settings):
-        calls.append(f"analyze:{stock_code}:{tech_result['score']}")
-        return "analysis-result"
+    def fake_builder(stock_data, result, code):
+        calls.append(f"build:{code}:{result['raw_score']}:{result['final_status']}")
+        return "local-report"
 
     def fake_notifier(content, settings):
-        calls.append(f"notify:{content.count('analysis-result')}")
+        calls.append(f"notify:{content.count('local-report')}")
         return True
 
     exit_code = main(
         settings=make_settings(),
         data_fetcher=fake_fetcher,
-        analyzer=fake_analyzer,
         notifier=fake_notifier,
-        signal_recorder=lambda rows: True,
+        report_builder=fake_builder,
     )
 
     assert exit_code == 0
-    assert calls == ["fetch:000001.SZ", "analyze:000001.SZ:100", "notify:1"]
+    assert calls == ["fetch:000001.SZ", "build:000001.SZ:100:强", "notify:1"]
+
+
+def test_main_has_no_analyzer_or_signal_recorder_dependency():
+    parameters = inspect.signature(main).parameters
+
+    assert "analyzer" not in parameters
+    assert "signal_recorder" not in parameters
+    assert "llm" not in inspect.getsource(main).lower()
 
 
 def test_main_returns_nonzero_when_tushare_token_missing():
@@ -102,73 +110,52 @@ def test_main_returns_nonzero_when_tushare_token_missing():
         debug_mode=True,
         my_stocks=["000001.SZ"],
         allowed_exchanges=("SH", "SZ", "BJ"),
-        llm_api_key="llm-key",
     )
 
-    exit_code = main(settings=settings)
-
-    assert exit_code == 1
+    assert main(settings=settings) == 1
 
 
 def test_main_reports_failed_codes_and_returns_nonzero():
     notifications: list[str] = []
-    settings = Settings(
-        tushare_token="token",
-        feishu_webhook="https://example.com",
-        debug_mode=True,
-        my_stocks=["000001.SZ", "000002.SZ"],
-        allowed_exchanges=("SH", "SZ", "BJ"),
-        llm_api_key="llm-key",
-    )
+    settings = make_settings(stocks=["000001.SZ", "000002.SZ"])
 
     def fake_fetcher(code, settings):
-        if code == "000001.SZ":
-            payload = make_strong_payload()
-            payload["latest"]["ts_code"] = code
-            return payload
-        return None
-
-    def fake_analyzer(stock_data, tech_result, stock_code, settings):
-        return f"analysis-result:{stock_code}:{tech_result['score']}"
+        return make_strong_payload() if code == "000001.SZ" else None
 
     def fake_notifier(content, settings):
         notifications.append(content)
         return True
 
+    exit_code = main(settings=settings, data_fetcher=fake_fetcher, notifier=fake_notifier)
+
+    assert exit_code == 1
+    assert len(notifications) == 1
+    assert "Momentum Corp" in notifications[0]
+    assert "000002.SZ" in notifications[0]
+
+
+def test_main_reports_data_provider_exception_as_failed_code():
+    notifications: list[str] = []
+
+    def failing_fetcher(code, settings):
+        raise RuntimeError("market snapshot unavailable")
+
     exit_code = main(
-        settings=settings,
-        data_fetcher=fake_fetcher,
-        analyzer=fake_analyzer,
-        notifier=fake_notifier,
-        signal_recorder=lambda rows: True,
+        settings=make_settings(),
+        data_fetcher=failing_fetcher,
+        notifier=lambda content, settings: notifications.append(content) or True,
     )
 
     assert exit_code == 1
     assert len(notifications) == 1
-    assert "analysis-result:000001.SZ:100" in notifications[0]
-    assert "000002.SZ" in notifications[0]
+    assert "000001.SZ" in notifications[0]
 
 
 def test_main_returns_nonzero_when_notification_fails():
-    settings = make_settings()
-
-    def fake_fetcher(code, settings):
-        payload = make_strong_payload()
-        payload["latest"]["ts_code"] = code
-        return payload
-
-    def fake_analyzer(stock_data, tech_result, stock_code, settings):
-        return "analysis-result"
-
-    def fake_notifier(content, settings):
-        return False
-
     exit_code = main(
-        settings=settings,
-        data_fetcher=fake_fetcher,
-        analyzer=fake_analyzer,
-        notifier=fake_notifier,
-        signal_recorder=lambda rows: True,
+        settings=make_settings(),
+        data_fetcher=lambda code, settings: make_strong_payload(),
+        notifier=lambda content, settings: False,
     )
 
     assert exit_code == 1
@@ -182,125 +169,34 @@ def test_main_skips_codes_filtered_by_exchange_without_failing():
         debug_mode=True,
         my_stocks=["000001.SZ", "430001.BJ"],
         allowed_exchanges=("SH", "SZ"),
-        llm_api_key="llm-key",
     )
 
     def fake_fetcher(code, settings):
-        calls.append(f"fetch:{code}")
-        payload = make_strong_payload()
-        payload["latest"]["ts_code"] = code
-        return payload
-
-    def fake_analyzer(stock_data, tech_result, stock_code, settings):
-        calls.append(f"analyze:{stock_code}:{tech_result['score']}")
-        return "analysis-result"
-
-    def fake_notifier(content, settings):
-        calls.append(f"notify:{content.count('analysis-result')}")
-        return True
-
-    exit_code = main(
-        settings=settings,
-        data_fetcher=fake_fetcher,
-        analyzer=fake_analyzer,
-        notifier=fake_notifier,
-        signal_recorder=lambda rows: True,
-    )
-
-    assert exit_code == 0
-    assert calls == ["fetch:000001.SZ", "analyze:000001.SZ:100", "notify:1"]
-
-
-def test_main_skips_llm_when_local_score_below_threshold(monkeypatch):
-    calls: list[str] = []
-    settings = make_settings()
-
-    def fake_fetcher(code, settings):
-        payload = make_strong_payload()
-        payload["latest"]["ts_code"] = code
-        return payload
-
-    def fake_analyzer(stock_data, tech_result, stock_code, settings):
-        calls.append("analyze-called")
-        return "analysis-result"
-
-    def fake_notifier(content, settings):
-        calls.append(content)
-        return True
-
-    monkeypatch.setattr(
-        "tradeeye.app.check_signals",
-        lambda _data: {
-            "score": 60,
-            "status": "local-only",
-            "detail": "low confidence",
-            "risk": "avoid overnight",
-            "action_plan": "watchlist",
-        },
-    )
-
-    exit_code = main(
-        settings=settings,
-        data_fetcher=fake_fetcher,
-        analyzer=fake_analyzer,
-        notifier=fake_notifier,
-        signal_recorder=lambda rows: True,
-    )
-
-    assert exit_code == 0
-    assert "analyze-called" not in calls
-    assert len(calls) == 1
-    assert "本地得分: 60" in calls[0]
-    assert "未调用 LLM 分析" in calls[0]
-
-
-def test_main_llm_threshold_from_rules(monkeypatch, tmp_path):
-    """把门槛改到 101 分时，任何股票都不应触发 LLM。"""
-    from tradeeye.strategies import rules as rules_module
-
-    yaml_file = tmp_path / "rules.yaml"
-    yaml_file.write_text("analysis: {llm_score_threshold: 101}\n", encoding="utf-8")
-    monkeypatch.setenv("TRADEEYE_RULES_FILE", str(yaml_file))
-    rules_module.get_rules.cache_clear()
-
-    analyzer_calls = []
-
-    def fake_fetcher(code, settings):
+        calls.append(code)
         return make_strong_payload()
 
-    def fake_analyzer(data, tech_result, code, settings):
-        analyzer_calls.append(code)
-        return "AI report"
-
-    result = main(
-        settings=make_settings(),
+    exit_code = main(
+        settings=settings,
         data_fetcher=fake_fetcher,
-        analyzer=fake_analyzer,
         notifier=lambda content, settings: True,
-        signal_recorder=lambda rows: True,
     )
 
-    rules_module.get_rules.cache_clear()
-    assert result == 0
-    assert analyzer_calls == []
+    assert exit_code == 0
+    assert calls == ["000001.SZ"]
 
 
-def test_main_records_signals_for_scored_stocks():
-    recorded = []
+def test_main_reports_key_data_gap_without_assigning_score():
+    payload = make_strong_payload()
+    del payload["latest"]["ma20"]
+    notifications: list[str] = []
 
-    result = main(
+    exit_code = main(
         settings=make_settings(),
-        data_fetcher=lambda code, settings: make_strong_payload() | {"trade_date": "20260724"},
-        analyzer=lambda data, tech_result, code, settings: "AI report",
-        notifier=lambda content, settings: True,
-        signal_recorder=lambda rows: recorded.extend(rows) or True,
+        data_fetcher=lambda code, settings: payload,
+        notifier=lambda content, settings: notifications.append(content) or True,
     )
 
-    assert result == 0
-    assert len(recorded) == 1
-    row = recorded[0]
-    assert row["date"] == "20260724"
-    assert row["ts_code"] == "000001.SZ"
-    assert row["close"] == 10.4
-    assert isinstance(row["score"], int)
-    assert isinstance(row["called_llm"], bool)
+    assert exit_code == 0
+    assert "原始总分：不评分" in notifications[0]
+    assert "最终状态：数据不足" in notifications[0]
+    assert "latest.ma20" in notifications[0]

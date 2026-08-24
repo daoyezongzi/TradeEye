@@ -25,8 +25,12 @@ MONEYFLOW_FIELDS = (
 LIMIT_FIELDS = "ts_code,trade_date,up_limit,down_limit"
 STOCK_BASIC_FIELDS = "ts_code,name,market,list_date,industry"
 
-_SNAPSHOT_CACHE: dict[tuple[str, str], "MarketSnapshot"] = {}
+_SNAPSHOT_CACHE: dict[tuple[str, str, tuple[str, ...]], "MarketSnapshot"] = {}
 _HISTORY_CACHE: dict[tuple[str, str, str], pd.DataFrame] = {}
+
+
+class DataProviderError(RuntimeError):
+    """Raised when required market data cannot be fetched safely."""
 
 
 @dataclass(frozen=True)
@@ -34,6 +38,7 @@ class MarketSnapshot:
     trade_date: str
     market_df: pd.DataFrame
     market_regime: dict[str, Any]
+    degraded_sources: tuple[str, ...] = ()
 
 
 def build_pro_client(settings: Settings):
@@ -57,17 +62,17 @@ def get_clean_data(code: str, settings: Settings, pro_client=None) -> dict[str, 
         market_row = snapshot.market_df.loc[snapshot.market_df["ts_code"] == code]
         if market_row.empty:
             logger.warning("%s has no market snapshot row on %s", code, snapshot.trade_date)
-            return None
+            return _unavailable_stock_payload(code, snapshot, "snapshot_row_missing")
 
         history_df = get_history_data(code, settings, snapshot.trade_date, client)
         if history_df.empty:
             logger.warning("No history returned for %s", code)
-            return None
+            return _unavailable_stock_payload(code, snapshot, "history_missing")
 
         history_df = history_df.sort_values("trade_date").reset_index(drop=True)
         if len(history_df.index) < 2:
             logger.warning("Not enough rows returned for %s", code)
-            return None
+            return _unavailable_stock_payload(code, snapshot, "history_insufficient")
 
         latest = history_df.iloc[-1].to_dict()
         prev = history_df.iloc[-2].to_dict()
@@ -79,7 +84,7 @@ def get_clean_data(code: str, settings: Settings, pro_client=None) -> dict[str, 
                 latest.get("trade_date"),
                 snapshot.trade_date,
             )
-            return None
+            return _unavailable_stock_payload(code, snapshot, "history_date_mismatch")
 
         latest.update(market_payload)
         latest["list_age_days"] = _get_list_age_days(market_payload.get("list_date"), snapshot.trade_date)
@@ -101,7 +106,10 @@ def get_clean_data(code: str, settings: Settings, pro_client=None) -> dict[str, 
             "latest": latest,
             "prev": prev,
             "market_regime": snapshot.market_regime,
+            "degraded_sources": snapshot.degraded_sources,
         }
+    except DataProviderError:
+        raise
     except Exception:
         logger.exception("Data engine failed for %s", code)
         return None
@@ -110,7 +118,8 @@ def get_clean_data(code: str, settings: Settings, pro_client=None) -> dict[str, 
 def get_market_snapshot(settings: Settings, pro_client=None) -> MarketSnapshot:
     client = pro_client or build_pro_client(settings)
     trade_date = resolve_trade_date(client)
-    cache_key = (settings.tushare_token, trade_date)
+    exchange_key = tuple(sorted(exchange.upper() for exchange in settings.allowed_exchanges))
+    cache_key = (settings.tushare_token, trade_date, exchange_key)
     cached = _SNAPSHOT_CACHE.get(cache_key)
     if cached is not None:
         return cached
@@ -118,35 +127,38 @@ def get_market_snapshot(settings: Settings, pro_client=None) -> MarketSnapshot:
     daily_df = _fetch_dataframe(
         "daily",
         lambda: client.daily(trade_date=trade_date, fields=DAILY_FIELDS),
+        required=True,
     )
     daily_df = _filter_by_allowed_exchanges(daily_df, settings.allowed_exchanges)
     if daily_df.empty:
-        snapshot = MarketSnapshot(
-            trade_date=trade_date,
-            market_df=pd.DataFrame(),
-            market_regime=_build_market_regime(pd.DataFrame()),
+        raise DataProviderError(
+            f"Required daily market data is empty for {trade_date}; state must not advance"
         )
-        _SNAPSHOT_CACHE[cache_key] = snapshot
-        return snapshot
+
+    degraded_sources: list[str] = []
 
     daily_basic_df = _fetch_dataframe(
         "daily_basic",
         lambda: client.daily_basic(trade_date=trade_date, fields=DAILY_BASIC_FIELDS),
+        failures=degraded_sources,
     )
     daily_basic_df = _filter_by_allowed_exchanges(daily_basic_df, settings.allowed_exchanges)
     moneyflow_df = _fetch_dataframe(
         "moneyflow",
         lambda: client.moneyflow(trade_date=trade_date, fields=MONEYFLOW_FIELDS),
+        failures=degraded_sources,
     )
     moneyflow_df = _filter_by_allowed_exchanges(moneyflow_df, settings.allowed_exchanges)
     limit_df = _fetch_dataframe(
         "stk_limit",
         lambda: client.stk_limit(trade_date=trade_date, fields=LIMIT_FIELDS),
+        failures=degraded_sources,
     )
     limit_df = _filter_by_allowed_exchanges(limit_df, settings.allowed_exchanges)
     stock_basic_df = _fetch_dataframe(
         "stock_basic",
         lambda: client.stock_basic(exchange="", list_status="L", fields=STOCK_BASIC_FIELDS),
+        failures=degraded_sources,
     )
     stock_basic_df = _filter_by_allowed_exchanges(stock_basic_df, settings.allowed_exchanges)
 
@@ -163,7 +175,12 @@ def get_market_snapshot(settings: Settings, pro_client=None) -> MarketSnapshot:
 
     market_df = _build_market_features(market_df)
     market_regime = _build_market_regime(market_df)
-    snapshot = MarketSnapshot(trade_date=trade_date, market_df=market_df, market_regime=market_regime)
+    snapshot = MarketSnapshot(
+        trade_date=trade_date,
+        market_df=market_df,
+        market_regime=market_regime,
+        degraded_sources=tuple(degraded_sources),
+    )
     _SNAPSHOT_CACHE[cache_key] = snapshot
 
     if settings.debug_mode and not market_df.empty:
@@ -186,6 +203,7 @@ def get_history_data(code: str, settings: Settings, trade_date: str, pro_client=
     history_df = _fetch_dataframe(
         f"daily:{code}",
         lambda: client.daily(ts_code=code, start_date=start_date, end_date=trade_date, fields=DAILY_FIELDS),
+        required=True,
     )
     if history_df.empty:
         return history_df
@@ -231,14 +249,15 @@ def resolve_trade_date(pro_client, now: dt.datetime | None = None) -> str:
     calendar_df = _fetch_dataframe(
         "trade_cal",
         lambda: pro_client.trade_cal(exchange="", start_date=start_date, end_date=end_date, fields="cal_date,is_open"),
+        required=True,
     )
     if calendar_df.empty:
-        return end_date
+        raise DataProviderError("Trading calendar is empty; cannot resolve a safe market date")
 
     calendar_df = _coerce_numeric(calendar_df, ["is_open"])
     open_days = sorted(calendar_df.loc[calendar_df["is_open"] == 1, "cal_date"].astype(str).tolist())
     if not open_days:
-        return end_date
+        raise DataProviderError("Trading calendar has no open days in the lookup window")
 
     latest_open_day = open_days[-1]
     if latest_open_day == end_date and now_in_market_tz.time() < SNAPSHOT_READY_TIME and len(open_days) >= 2:
@@ -273,7 +292,20 @@ def _build_market_features(market_df: pd.DataFrame) -> pd.DataFrame:
         "up_limit",
         "down_limit",
     ]
+    for column in numeric_columns:
+        if column not in market_df.columns:
+            market_df[column] = pd.NA
     market_df = _coerce_numeric(market_df, numeric_columns)
+    market_df["daily_basic_available"] = market_df[["turnover_rate", "volume_ratio"]].notna().all(axis=1)
+    market_df["moneyflow_available"] = market_df[
+        [
+            "net_mf_amount",
+            "buy_lg_amount",
+            "sell_lg_amount",
+            "buy_elg_amount",
+            "sell_elg_amount",
+        ]
+    ].notna().all(axis=1)
 
     amount_wan = market_df["amount"] / 10
     large_order_net_amount = (
@@ -361,13 +393,29 @@ def _build_market_regime(market_df: pd.DataFrame) -> dict[str, Any]:
     }
 
 
-def _fetch_dataframe(label: str, query) -> pd.DataFrame:
+def _fetch_dataframe(
+    label: str,
+    query,
+    *,
+    required: bool = False,
+    failures: list[str] | None = None,
+) -> pd.DataFrame:
     try:
         df = query()
         if df is None:
+            if failures is not None:
+                failures.append(label)
             return pd.DataFrame()
-        return df.copy()
-    except Exception:
+        copied = df.copy()
+        if copied.empty and failures is not None:
+            failures.append(label)
+        return copied
+    except Exception as exc:
+        if required:
+            logger.exception("Required Tushare query failed for %s", label)
+            raise DataProviderError(f"Required Tushare query failed: {label}") from exc
+        if failures is not None:
+            failures.append(label)
         logger.exception("Tushare query failed for %s", label)
         return pd.DataFrame()
 
@@ -406,6 +454,22 @@ def _get_list_age_days(list_date: Any, trade_date: str) -> int:
     except ValueError:
         return 9999
     return max((traded_on - listed_on).days, 0)
+
+
+def _unavailable_stock_payload(
+    code: str,
+    snapshot: MarketSnapshot,
+    issue: str,
+) -> dict[str, Any]:
+    return {
+        "name": code,
+        "trade_date": snapshot.trade_date,
+        "latest": None,
+        "prev": None,
+        "market_regime": snapshot.market_regime,
+        "degraded_sources": snapshot.degraded_sources,
+        "data_quality_issue": issue,
+    }
 
 
 def _safe_divide(numerator: float, denominator: float) -> float:

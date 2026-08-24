@@ -1,7 +1,15 @@
 ﻿import datetime as dt
 
 from tradeeye.config import Settings
-from tradeeye.services.rss import NewsItem, collect_news, fetch_feed, load_feed_urls
+import pytest
+
+from tradeeye.services.rss import (
+    NewsCollectionError,
+    NewsItem,
+    collect_news,
+    fetch_feed,
+    load_feed_urls,
+)
 
 
 class _DummyResponse:
@@ -29,7 +37,6 @@ def _make_settings(**kwargs) -> Settings:
         debug_mode=True,
         my_stocks=[],
         allowed_exchanges=("SH", "SZ", "BJ"),
-        recommender_industries=(),
         news_rss_feeds=(),
         news_rss_feeds_file="not-exists.txt",
         news_lookback_hours=24,
@@ -38,7 +45,6 @@ def _make_settings(**kwargs) -> Settings:
         news_exclude_keywords=(),
         news_push_when_empty=False,
         news_template_file="tradeeye/resources/news_template.txt",
-        llm_api_key="llm-key",
     )
     base.update(kwargs)
     return Settings(**base)
@@ -170,3 +176,13 @@ def test_collect_news_continues_when_one_feed_fails():
 
     assert len(results) == 1
     assert results[0].link == "https://n.example/ok"
+
+
+def test_collect_news_fails_when_all_configured_feeds_fail():
+    settings = _make_settings(news_rss_feeds=("bad-a", "bad-b"))
+
+    def failed_fetcher(_url: str) -> list[NewsItem]:
+        raise RuntimeError("network down")
+
+    with pytest.raises(NewsCollectionError, match="All 2 configured RSS feeds failed"):
+        collect_news(settings, fetcher=failed_fetcher)
