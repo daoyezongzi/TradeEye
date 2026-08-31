@@ -21,7 +21,7 @@ on:
           - analysis
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: tradeeye-data-writer
@@ -29,20 +29,16 @@ concurrency:
 
 jobs:
   core_batch:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
-    env:
-      TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
-      FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
-      MY_STOCKS: ${{ vars.MY_STOCKS || '600370.SH,600157.SH,603010.SH,002372.SZ,600905.SH,600009.SH,600010.SH' }}
-      ALLOWED_EXCHANGES: ${{ vars.ALLOWED_EXCHANGES || 'SH,SZ,BJ' }}
-      TRADEEYE_RULES_FILE: ${{ vars.TRADEEYE_RULES_FILE || '' }}
-      DEBUG_MODE: "false"
 
     steps:
       - name: Checkout main
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           ref: main
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
@@ -58,6 +54,13 @@ jobs:
         if: >
           (github.event_name == 'schedule' && github.event.schedule == '0 22 * * 0-4') ||
           (github.event_name == 'workflow_dispatch' && github.event.inputs.job_type == 'recommend')
+        env:
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+          FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
+          MY_STOCKS: ${{ vars.MY_STOCKS || '600370.SH,600157.SH,603010.SH,002372.SZ,600905.SH,600009.SH,600010.SH' }}
+          ALLOWED_EXCHANGES: ${{ vars.ALLOWED_EXCHANGES || 'SH,SZ,BJ' }}
+          TRADEEYE_RULES_FILE: ${{ vars.TRADEEYE_RULES_FILE || '' }}
+          DEBUG_MODE: "false"
         run: python recommend_main.py
 
       - name: Settle recommendation trades and NAV
@@ -65,6 +68,11 @@ jobs:
           (github.event_name == 'schedule' && github.event.schedule == '0 10 * * 1-5') ||
           (github.event_name == 'workflow_dispatch' &&
             (github.event.inputs.job_type == 'evening' || github.event.inputs.job_type == 'settle'))
+        env:
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+          MY_STOCKS: ${{ vars.MY_STOCKS || '600370.SH,600157.SH,603010.SH,002372.SZ,600905.SH,600009.SH,600010.SH' }}
+          ALLOWED_EXCHANGES: ${{ vars.ALLOWED_EXCHANGES || 'SH,SZ,BJ' }}
+          DEBUG_MODE: "false"
         run: python portfolio_main.py
 
       - name: Run post-close stock diagnostics
@@ -72,13 +80,61 @@ jobs:
           (github.event_name == 'schedule' && github.event.schedule == '0 10 * * 1-5') ||
           (github.event_name == 'workflow_dispatch' &&
             (github.event.inputs.job_type == 'evening' || github.event.inputs.job_type == 'analysis'))
+        env:
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+          FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
+          MY_STOCKS: ${{ vars.MY_STOCKS || '600370.SH,600157.SH,603010.SH,002372.SZ,600905.SH,600009.SH,600010.SH' }}
+          ALLOWED_EXCHANGES: ${{ vars.ALLOWED_EXCHANGES || 'SH,SZ,BJ' }}
+          TRADEEYE_RULES_FILE: ${{ vars.TRADEEYE_RULES_FILE || '' }}
+          DEBUG_MODE: "false"
         run: python main.py
 
+      - name: Upload generated state
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: tradeeye-generated-state-${{ github.run_id }}
+          path: |
+            data/signals/analysis.csv
+            data/signals/recommend.csv
+            data/signals/etf_recommend.csv
+            data/trades/recommend_trades.csv
+            data/portfolio/recommend_nav.csv
+          if-no-files-found: ignore
+          retention-days: 1
+
+  commit_state:
+    if: needs.core_batch.result == 'success'
+    needs: core_batch
+    permissions:
+      contents: write
+      actions: read
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout main for state write
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Download generated state
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: tradeeye-generated-state-${{ github.run_id }}
+          path: .
+          if-no-artifact: ignore
+
       - name: Commit generated state
-        if: always()
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          git add -f data/signals/ data/trades/ data/portfolio/ 2>/dev/null || true
+          git add -f \
+            data/signals/analysis.csv \
+            data/signals/recommend.csv \
+            data/signals/etf_recommend.csv \
+            data/trades/recommend_trades.csv \
+            data/portfolio/recommend_nav.csv 2>/dev/null || true
           if git diff --cached --quiet; then
             echo "No state changes to commit."
             exit 0
@@ -86,5 +142,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "chore: record TradeEye state $(date -u +%Y-%m-%d) [skip ci]"
-          git pull --rebase origin main
-          git push origin HEAD:main
+          git -c http.extraheader="AUTHORIZATION: bearer ${GH_TOKEN}" pull --rebase origin main
+          git -c http.extraheader="AUTHORIZATION: bearer ${GH_TOKEN}" push origin HEAD:main

@@ -4,6 +4,7 @@ import os
 import re
 from dataclasses import dataclass
 from functools import lru_cache
+from pathlib import Path
 from typing import Iterable
 
 from dotenv import load_dotenv
@@ -23,8 +24,17 @@ DEFAULT_ALLOWED_EXCHANGES = ("SH", "SZ", "BJ")
 DEFAULT_NEWS_LOOKBACK_HOURS = 24
 DEFAULT_NEWS_MAX_ITEMS = 15
 DEFAULT_NEWS_PUSH_WHEN_EMPTY = False
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+NEWS_RESOURCES_DIR = PROJECT_ROOT / "tradeeye" / "resources"
+STRATEGIES_DIR = PROJECT_ROOT / "tradeeye" / "strategies"
 DEFAULT_NEWS_FEEDS_FILE = "tradeeye/resources/news_feeds.txt"
 DEFAULT_NEWS_TEMPLATE_FILE = "tradeeye/resources/news_template.txt"
+DEFAULT_NEWS_RSS_ALLOWED_HOSTS = (
+    "in-en.com",
+    "www.in-en.com",
+    "chinanews.com.cn",
+    "www.chinanews.com.cn",
+)
 DEFAULT_BACKTEST_LOOKBACK_DAYS = 45
 STOCK_CODE_PATTERN = re.compile(r"^\d{6}\.(?:SH|SZ|BJ)$")
 
@@ -88,6 +98,36 @@ def parse_int(value: str | None, default: int, minimum: int = 0) -> int:
     except (TypeError, ValueError):
         return default
     return parsed if parsed >= minimum else default
+
+
+def resolve_repo_path(value: str | Path, allowed_dir: str | Path, setting_name: str) -> Path:
+    """Resolve a configuration-controlled file and keep it under ``allowed_dir``.
+
+    Relative paths are interpreted from the repository root rather than the
+    process working directory. ``Path.resolve`` also follows existing
+    symlinks, so a link from an allowed directory to an external file is not
+    accepted.
+    """
+    raw_value = str(value).strip()
+    if not raw_value:
+        raise ValueError(f"{setting_name} must not be empty")
+
+    candidate = Path(raw_value)
+    if not candidate.is_absolute():
+        candidate = PROJECT_ROOT / candidate
+
+    try:
+        resolved = candidate.resolve(strict=False)
+        allowed = Path(allowed_dir).resolve(strict=True)
+        resolved.relative_to(allowed)
+    except (OSError, ValueError) as exc:
+        raise ValueError(
+            f"{setting_name} must point to a file inside {allowed_dir}"
+        ) from exc
+
+    if resolved == allowed:
+        raise ValueError(f"{setting_name} must point to a file inside {allowed_dir}")
+    return resolved
 
 
 def parse_exchange_list(
@@ -157,6 +197,7 @@ class Settings:
     news_push_when_empty: bool = DEFAULT_NEWS_PUSH_WHEN_EMPTY
     news_template_file: str = DEFAULT_NEWS_TEMPLATE_FILE
     backtest_lookback_days: int = DEFAULT_BACKTEST_LOOKBACK_DAYS
+    news_rss_allowed_hosts: tuple[str, ...] = DEFAULT_NEWS_RSS_ALLOWED_HOSTS
 
     def __post_init__(self) -> None:
         invalid_stocks = [
@@ -183,6 +224,10 @@ class Settings:
             news_rss_feeds=parse_csv_list(os.getenv("NEWS_RSS_FEEDS")),
             news_rss_feeds_file=(
                 os.getenv("NEWS_RSS_FEEDS_FILE", DEFAULT_NEWS_FEEDS_FILE).strip() or DEFAULT_NEWS_FEEDS_FILE
+            ),
+            news_rss_allowed_hosts=parse_csv_list(
+                os.getenv("NEWS_RSS_ALLOWED_HOSTS"),
+                default=DEFAULT_NEWS_RSS_ALLOWED_HOSTS,
             ),
             news_lookback_hours=parse_int(
                 os.getenv("NEWS_LOOKBACK_HOURS"),

@@ -39,10 +39,17 @@ def test_load_rules_explicit_missing_file_raises(tmp_path):
 
 
 def test_load_rules_env_missing_file_raises(tmp_path, monkeypatch):
-    missing = tmp_path / "missing-env.yaml"
+    missing = rules_module.RULES_ALLOWED_DIR / "missing-env.yaml"
     monkeypatch.setenv("TRADEEYE_RULES_FILE", str(missing))
 
     with pytest.raises(RulesValidationError, match=r"Rules file does not exist: .*missing-env\.yaml"):
+        load_rules()
+
+
+def test_load_rules_env_rejects_path_outside_strategy_directory(tmp_path, monkeypatch):
+    monkeypatch.setenv("TRADEEYE_RULES_FILE", str(tmp_path / "outside.yaml"))
+
+    with pytest.raises(RulesValidationError, match="TRADEEYE_RULES_FILE"):
         load_rules()
 
 
@@ -153,6 +160,7 @@ def test_packaged_rules_yaml_exists_and_matches_defaults():
 def test_load_rules_env_override(tmp_path, monkeypatch):
     yaml_file = tmp_path / "custom.yaml"
     yaml_file.write_text("recommender: {minimum_quality_score: 60}\n", encoding="utf-8")
+    monkeypatch.setattr(rules_module, "RULES_ALLOWED_DIR", tmp_path)
     monkeypatch.setenv("TRADEEYE_RULES_FILE", str(yaml_file))
 
     assert load_rules().recommender.minimum_quality_score == 60

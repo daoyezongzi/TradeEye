@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
-from pathlib import Path
 from typing import Callable
 
-from tradeeye.config import Settings, load_settings
+from tradeeye.config import NEWS_RESOURCES_DIR, Settings, load_settings, resolve_repo_path
 from tradeeye.logging_utils import configure_logging
 from tradeeye.services.notifier import send_text
 from tradeeye.services.rss import NewsItem, collect_news
@@ -95,9 +94,13 @@ def _build_items_block(news_items: list[NewsItem]) -> str:
 
 
 def _load_template_text(settings: Settings) -> str:
-    template_path = Path(settings.news_template_file)
+    template_path = resolve_repo_path(
+        settings.news_template_file,
+        NEWS_RESOURCES_DIR,
+        "NEWS_TEMPLATE_FILE",
+    )
     if not template_path.exists():
-        logger.warning("Template file does not exist: %s", settings.news_template_file)
+        logger.warning("Configured news template does not exist; using the default template")
         return _DEFAULT_TEMPLATE
 
     text = template_path.read_text(encoding="utf-8").strip()

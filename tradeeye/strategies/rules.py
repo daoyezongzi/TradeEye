@@ -11,8 +11,11 @@ from typing import Any, Mapping, Union, get_args, get_origin, get_type_hints
 
 import yaml
 
+from tradeeye.config import STRATEGIES_DIR, resolve_repo_path
+
 RULES_FILE_ENV = "TRADEEYE_RULES_FILE"
 DEFAULT_RULES_FILE = Path(__file__).with_name("rules.yaml")
+RULES_ALLOWED_DIR = STRATEGIES_DIR.resolve()
 
 
 @dataclass(frozen=True)
@@ -304,7 +307,17 @@ class RulesValidationError(ValueError):
 def load_rules(path: str | Path | None = None) -> Rules:
     defaults = Rules()
     env_path = os.getenv(RULES_FILE_ENV, "").strip()
-    rules_path = Path(path or env_path or DEFAULT_RULES_FILE)
+    if path is not None:
+        # Explicit callers may provide an isolated test/configuration path.
+        # The environment-controlled production override is scoped below.
+        rules_path = Path(path)
+    elif env_path:
+        try:
+            rules_path = resolve_repo_path(env_path, RULES_ALLOWED_DIR, RULES_FILE_ENV)
+        except ValueError as exc:
+            raise RulesValidationError(str(exc)) from exc
+    else:
+        rules_path = DEFAULT_RULES_FILE
     if not rules_path.exists():
         raise RulesValidationError(f"Rules file does not exist: {rules_path}")
 

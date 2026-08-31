@@ -1,7 +1,9 @@
 ﻿import datetime as dt
 
+import pytest
+
 from tradeeye.config import Settings
-from tradeeye.news_app import build_news_content, main
+from tradeeye.news_app import _load_template_text, build_news_content, main
 from tradeeye.services.rss import NewsItem
 
 
@@ -123,3 +125,10 @@ def test_main_returns_nonzero_when_collection_fails():
         raise RuntimeError("all feeds unavailable")
 
     assert main(settings=settings, collector=failed_collector) == 1
+
+
+def test_template_path_rejects_external_file(tmp_path):
+    settings = _make_settings(news_template_file=str(tmp_path / "secret.txt"))
+
+    with pytest.raises(ValueError, match="NEWS_TEMPLATE_FILE"):
+        _load_template_text(settings)

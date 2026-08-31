@@ -2,7 +2,9 @@
     DEFAULT_ALLOWED_EXCHANGES,
     DEFAULT_NEWS_LOOKBACK_HOURS,
     DEFAULT_NEWS_MAX_ITEMS,
+    DEFAULT_NEWS_RSS_ALLOWED_HOSTS,
     DEFAULT_STOCKS,
+    NEWS_RESOURCES_DIR,
     Settings,
     extract_exchange,
     load_settings,
@@ -11,6 +13,7 @@
     parse_exchange_list,
     parse_int,
     parse_stock_list,
+    resolve_repo_path,
     split_stocks_by_exchange,
 )
 
@@ -86,6 +89,7 @@ def test_load_settings_reads_environment(monkeypatch):
     monkeypatch.setenv("ALLOWED_EXCHANGES", "沪深")
     monkeypatch.setenv("NEWS_RSS_FEEDS", "https://a.example/rss.xml,https://b.example/feed.xml")
     monkeypatch.setenv("NEWS_RSS_FEEDS_FILE", "tradeeye/resources/custom_news_feeds.txt")
+    monkeypatch.setenv("NEWS_RSS_ALLOWED_HOSTS", "a.example,b.example")
     monkeypatch.setenv("NEWS_LOOKBACK_HOURS", "36")
     monkeypatch.setenv("NEWS_MAX_ITEMS", "20")
     monkeypatch.setenv("NEWS_INCLUDE_KEYWORDS", "A股,美股")
@@ -104,6 +108,7 @@ def test_load_settings_reads_environment(monkeypatch):
     assert settings.allowed_exchanges == ("SH", "SZ")
     assert settings.news_rss_feeds == ("https://a.example/rss.xml", "https://b.example/feed.xml")
     assert settings.news_rss_feeds_file == "tradeeye/resources/custom_news_feeds.txt"
+    assert settings.news_rss_allowed_hosts == ("a.example", "b.example")
     assert settings.news_lookback_hours == 36
     assert settings.news_max_items == 20
     assert settings.news_include_keywords == ("A股", "美股")
@@ -115,6 +120,7 @@ def test_load_settings_reads_environment(monkeypatch):
 def test_load_settings_uses_defaults_when_invalid(monkeypatch):
     monkeypatch.setenv("NEWS_RSS_FEEDS", "")
     monkeypatch.setenv("NEWS_RSS_FEEDS_FILE", "")
+    monkeypatch.delenv("NEWS_RSS_ALLOWED_HOSTS", raising=False)
     monkeypatch.setenv("NEWS_LOOKBACK_HOURS", "0")
     monkeypatch.setenv("NEWS_MAX_ITEMS", "-1")
     monkeypatch.setenv("NEWS_PUSH_WHEN_EMPTY", "invalid")
@@ -123,6 +129,7 @@ def test_load_settings_uses_defaults_when_invalid(monkeypatch):
     settings = load_settings()
 
     assert settings.news_rss_feeds == ()
+    assert settings.news_rss_allowed_hosts == DEFAULT_NEWS_RSS_ALLOWED_HOSTS
     assert settings.news_lookback_hours == DEFAULT_NEWS_LOOKBACK_HOURS
     assert settings.news_max_items == DEFAULT_NEWS_MAX_ITEMS
     assert settings.news_push_when_empty is False
@@ -141,3 +148,8 @@ def test_backtest_lookback_days_env(monkeypatch):
 def test_backtest_lookback_days_invalid_falls_back(monkeypatch):
     monkeypatch.setenv("BACKTEST_LOOKBACK_DAYS", "0")
     assert Settings.from_env().backtest_lookback_days == 45
+
+
+def test_resolve_repo_path_rejects_paths_outside_allowed_directory(tmp_path):
+    with pytest.raises(ValueError, match="NEWS_TEMPLATE_FILE"):
+        resolve_repo_path(tmp_path / "secret.txt", NEWS_RESOURCES_DIR, "NEWS_TEMPLATE_FILE")

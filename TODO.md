@@ -1,6 +1,6 @@
 # TradeEye TODO
 
-最后更新：2026-08-24
+最后更新：2026-08-31
 
 ## 当前状态
 
@@ -24,6 +24,7 @@
 - [x] 主行情失败时停止推进，辅助行情可显式降级；缓存键、配置校验、退出码、飞书业务响应和 RSS 全源失败路径已经补强。
 - [x] Actions 调整为工作日 06:00 荐股、18:00 结算后诊断、周五 19:30 周报，并新增 push/PR CI。
 - [x] Actions 持久化 `data/signals/`、`data/trades/` 和 `data/portfolio/`；运行依赖与测试依赖分离。
+- [x] 2026-08-31 安全加固：Actions action SHA/凭据边界、精确依赖版本、RSS SSRF/XML/大小限制、URL 脱敏和配置文件路径边界。
 - [x] 同步 README、`.env.example`、`rules.yaml`、BAT、本地入口和数据文件说明；删除过时的 `file_list.txt`。
 - [x] 补齐荐股、ETF、交易状态机、组合、周报、数据降级、通知、配置和工作流测试。
 

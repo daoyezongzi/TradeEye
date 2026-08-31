@@ -1192,3 +1192,20 @@ total_score = short_burst * 0.4
 - 无 `.tmp/` 的 Linux/Python 3.13 clean checkout 模拟：`150 passed`，随后 `compileall` 通过。
 - 推送后的真实 `TradeEye CI` 已通过；手动 `settle` 生产任务也已成功结算到 `20260824`，写入 210 条交易状态与 22 条 NAV。日志中的 9 个北交所跌停价缺失均按单股告警降级，没有再阻断整批。
 - 本次用 `settle` 模式验证原故障路径，未主动补发盘后飞书消息；飞书步骤留给下一次正常 `evening` 批次验证，避免产生重复通知。
+
+## 2026-08-31｜安全边界加固（本地未提交）
+
+### 修复结果
+
+- 四个 GitHub Actions 工作流的第三方 action 继续使用完整 commit SHA；checkout 关闭凭据持久化，业务 Secret 改为仅注入实际业务步骤。核心批次只拥有 `contents: read`，生成状态以短期 artifact 交给独立的 `contents: write` 提交任务，写入 token 仅在提交步骤使用。
+- 运行依赖与开发依赖改为精确版本固定；未引入真实凭据，也未改写 Git 历史或推送。
+- RSS 只接受 HTTPS 和显式主机 allowlist，每次重定向重新校验；来源数、来源文件大小、响应大小、条数、文本长度均有上限，XML 通过 Expat 回调拒绝 DTD/entity。
+- RSS 失败日志只保留脱敏 URL 骨架和异常类型；新闻模板、RSS 来源文件以及环境变量规则文件限制在各自仓库目录内，并拒绝 `..` 穿越与外部符号链接。
+- 新增 SSRF/重定向、URL 脱敏、路径越界、响应/XML/条数上限和工作流安全回归测试。
+
+### 验证证据与限制
+
+- `python -m pytest`：`169 passed`（Windows/Python 3.14.4）；相关安全测试与工作流测试合计为 `70 passed`。
+- 四个 workflow 均通过本地 PyYAML 解析；`git diff --check` 通过。
+- 本地 gitleaks 扫描未发现跟踪源文件中的新凭据；报告中的 11 项来自被忽略的 `.env` 和 `.tmp`/第三方包测试夹具，已脱敏保存到审计工作目录。
+- 未安装依赖、未访问生产 RSS/Tushare/飞书、未运行 GitHub Actions；精确版本未在全新 runner 上重装验证，依赖仍未达到带 hash 的完全可复现锁定。

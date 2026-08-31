@@ -106,7 +106,7 @@ etf:
 
 - `hard_min / hard_max: null` 表示不做硬价格过滤；需要限定价格范围时再填写正数。
 - 修改策略语义时应同时升级 `strategy_version`，避免不同规则被拼进同一净值序列。
-- 本地或 Actions 可用 `TRADEEYE_RULES_FILE` 临时指向仓库中的另一份 YAML 做参数实验；显式路径不存在时任务会失败。
+- 本地或 Actions 可用 `TRADEEYE_RULES_FILE` 临时指向 `tradeeye/strategies/` 目录内的另一份 YAML 做参数实验；仓库外、`..` 穿越和指向外部的符号链接会被拒绝。
 - ETF 默认零接口调用。启用后使用动能 45、收盘质量 35、流动性 20 的独立评分，不读取股票资金流，也不竞争股票 Top 5 或股票组合槽位。
 
 ETF 行情使用 Tushare [ETF 基础信息](https://tushare.pro/document/2?doc_id=385) 和 [公募基金日线行情](https://tushare.pro/document/2?doc_id=127)。接口权限或白名单行情不可用时，只降级 ETF 分支，股票荐股继续运行。
@@ -196,13 +196,13 @@ CSV 使用稳定 ID、版本化表头、首次写入不覆盖和同目录临时�
 需要在仓库设置：
 
 - Secrets：`TUSHARE_TOKEN`、`FEISHU_WEBHOOK`
-- Variables：`MY_STOCKS`、`ALLOWED_EXCHANGES`、`BACKTEST_LOOKBACK_DAYS`，可选 `TRADEEYE_RULES_FILE`，以及需要时的新闻变量
+- Variables：`MY_STOCKS`、`ALLOWED_EXCHANGES`、`BACKTEST_LOOKBACK_DAYS`，可选 `TRADEEYE_RULES_FILE`，以及需要时的新闻变量。新闻源主机必须通过 `NEWS_RSS_ALLOWED_HOSTS` 显式 allowlist；`NEWS_RSS_FEEDS_FILE` 和 `NEWS_TEMPLATE_FILE` 只能指向 `tradeeye/resources/` 内文件。
 
 业务工作流只安装运行依赖，不重复跑完整测试；写数据的任务共享同一并发组，提交 `data/signals/`、`data/trades/` 和 `data/portfolio/`。周五周报在发送前还会确认当天晚间核心批次已经成功完成，避免调度延迟时读取旧账本。项目不再需要任何 LLM Secret、模型地址或超时变量，旧的相关 GitHub 配置可手动删除。
 
 ## News 边界
 
-`news` 暂时保持为独立、低优先级的单向资讯接口，不参与评分、交易或周报。它支持多个 RSS/Atom 源、包含/排除关键词、回看时间窗、去重、条数上限、自定义模板和无结果是否推送；全部已配置来源均失败时任务返回失败，不把故障伪装成正常空结果。跨批次持久去重、逐来源健康汇总与未知发布时间处理保留在 TODO。
+`news` 暂时保持为独立、低优先级的单向资讯接口，不参与评分、交易或周报。它支持多个 RSS/Atom 源、包含/排除关键词、回看时间窗、去重、条数上限、自定义模板和无结果是否推送；RSS 只允许 HTTPS 与显式 allowlist 主机，重定向会重新校验，并限制来源数量、响应字节数、每源条数和 XML DTD/entity；全部已配置来源均失败时任务返回失败，不把故障伪装成正常空结果。跨批次持久去重、逐来源健康汇总与未知发布时间处理保留在 TODO。
 
 ## 验证
 
